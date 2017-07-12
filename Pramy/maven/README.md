@@ -178,6 +178,9 @@ A-->D-->X.jar(version=1.2)
 # 插件
 
 - source:一个用来打包的插件，可以打包java文件：`mvn source:jar`
-- 配置如图：![3](image/3.png)
-- 具体的架构跟```<dependencyManagement>``` 差不多，```<pluginManagement>```要写在build里面，然后声明```<plugins>```，然后再到具体```<plugin>```，```<plugin>```有gav，其中的```<execution>```(运行)可以用```<phase>```绑定生命周期，用```<goal>``` 绑定目标，其实就是执行的命令（具体目标可以在下载插件的网址可以看到），例如sources的：![4](image/4.png),     其实就相当于```mvn source:jar```。 然后到了```<configurartion>``` 这个是配置文件，给插件配置参数，具体能配一些什么要看原本的说明，或者查看源码：![5](image/5.png)
+- 配置如图：
+- ![3](image/3.png)
+- 具体的架构跟```<dependencyManagement>``` 差不多，```<pluginManagement>```要写在build里面，然后声明```<plugins>```，然后再到具体```<plugin>```，```<plugin>```有gav，其中的```<execution>```(运行)可以用```<phase>```绑定生命周期，用```<goal>``` 绑定目标，其实就是执行的命令（具体目标可以在下载插件的网址可以看到），例如sources的：其实就相当于```mvn source:jar```。
+  ![4](image/4.png),   
+  然后到了```<configurartion>``` 这个是配置文件，给插件配置参数，具体能配一些什么要看原本的说明，或者查看源码：![5](image/5.png)
 
