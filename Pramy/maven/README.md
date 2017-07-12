@@ -44,60 +44,58 @@
 | system   | 指定不开源的jar或者非公开的jar。需要设置路径，不打包          |
 
 # 各个模块之间的依赖
-  1. 直接依赖 
+1.直接依赖 
 
-     moduleA依赖于moduleB：A-->B
+moduleA依赖于moduleB：A-->B
 
-     A的pom配置：
+A的pom配置：
 
-     ```xml
-             <dependency>
+```xml
+          <dependency>
                  <groupId>com.project</groupId>
                  <artifactId>project.B</artifactId>
                  <version>0.0.1-SNAPSHOT</version>
-             </dependency>
-     ```
+          </dependency>
+```
 
-     B必须先安装到本地库，否则编译A时会抛异常
+B必须先安装到本地库，否则编译A时会抛异常
 
-     B: clean install --> A :clean compile
+B: clean install --> A :clean compile
 
-     A会依赖于B所依赖的module或者jar（传递性）
+A会依赖于B所依赖的module或者jar（传递性）
 
-     **但是A不会依赖B中的scope为test的jar，B也不会依赖它所以来的module中的scope为test的jar **
+**但是A不会依赖B中的scope为test的jar，B也不会依赖它所以来的module中的scope为test的jar **
 
-  2. 间接接依赖
+2.间接接依赖
 
-    C添加对A的依赖，同时排除对B的依赖
+C添加对A的依赖，同时排除对B的依赖
 
-    ```xml
-    		<dependency>
-                <groupId>com.project</groupId>
-                <artifactId>project.B</artifactId>
-                <version>0.0.1-SNAPSHOT</version>
-                <exclusions>
-                  <exclusion>
-                        <groupId>com.project</groupId>
-                        <artifactId>project.A</artifactId>  
-                    <!--这里的exclusion里面可以是具体的一个module，也可以是具体的一个jar-->
-                  </exclusion>
-                </exclusions>
-            </dependency>
-        
-    ```
+```xml
+    	<dependency>
+            <groupId>com.project</groupId>
+            <artifactId>project.B</artifactId>
+            <version>0.0.1-SNAPSHOT</version>
+            <exclusions>
+                <exclusion>
+                  <groupId>com.project</groupId>
+                  <artifactId>project.A</artifactId>  
+                  <!--这里的exclusion里面可以是具体的一个module，也可以是具体的一个jar-->
+                </exclusion>
+            </exclusions>
+        </dependency>
+```
 
-    ​
 
-    情况1：
+情况1：
     **user-core**->**log4j.jar** (version=1.2.17)
     **user-log** ->**log4j.jar**(version=1.2.0)
     **user-service**->**user-log** && **user-service**->**user-core**
     **user-service**会根据谁先写在pom文件的最前面
     ![2](image/2.png)
-       情况2：
-    ​    A-->B-->C-->X.jar(version=1.1)
-    ​    A-->D-->X.jar(version=1.2)
-    ​    结果就是A——>X.jar(version=1.2)
+情况2：
+       A-->B-->C-->X.jar(version=1.1)
+       A-->D-->X.jar(version=1.2)
+       结果就是A——>X.jar(version=1.2)
 
 
   **总结：最短路径原则和最先申明原则**
@@ -135,4 +133,3 @@
 
 - 子类会自动继承父类的dependency，父类的dependcyManagement依赖关系只是为了统一版本号，不会被子项目自动继承，除非子项目主动引用。
 - 对于聚合模块来说，它知道有哪些被聚合的模块，但那些被聚合的模块不知道这个聚合模块的存在。对于继承关系的父 POM来说，它不知道有哪些子模块继承与它，但那些子模块都必须知道自己的父 POM是什么
-- ​
