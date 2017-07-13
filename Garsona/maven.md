@@ -8,7 +8,7 @@ Tags : maven markdown
 
 maven最大的好处就是不需要导入jar包，而是将jar包的gav，也即坐标写入pom.xml中
 
-![1499753628(1)](C:\Users\wxs\Desktop\1499753628(1).png)
+
 
 ​			             （gav为图中dependency中的内容）
 
