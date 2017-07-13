@@ -1,3 +1,12 @@
+
+
+# 重要声明：由于mybatis-gennerator源码的缺陷，存在beanMapper.xml文件的时候，重新执行generator命令的时候，xml不会overwrite掉，只会在后面追加重复的内容
+
+
+> [解决办法](https://my.oschina.net/u/140938/blog/220006) .
+
+
+
 # 首先要在mavn里面的pom配置好
 
 ![1](image/1.png)

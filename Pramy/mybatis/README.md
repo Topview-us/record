@@ -1,4 +1,4 @@
-# 一   conf.xml
+# 一   mybatisConfig.xml
 
 ```xml
 <?xml version="1.0" encoding="UTF-8" ?>
@@ -6,31 +6,52 @@
   PUBLIC "-//mybatis.org//DTD Config 3.0//EN"
   "http://mybatis.org/dtd/mybatis-3-config.dtd">
 <configuration>
+  
+  <properties resource="db.properties"/>
+  
   <typeAliases>  
-      <package name="com.mybatis.entity"/>        
-      <typeAlias alias="User" type="com.mybatis.entity.User"/>  
+      <package name="${moduleLocation}"/>     
+      <typeAlias alias="User" type="com.pramy.module.User"/>  
       <!--还有一种方法用注解@ -->
   </typeAliases> 
   
-  <environments default="development">
-    <environment id="development">
-      <transactionManager type="JDBC"/>
-      <dataSource type="POOLED">
-        <property name="driver" value="${driver}"/>
-        <property name="url" value="${url}"/>
-        <property name="username" value="${username}"/>
-        <property name="password" value="${password}"/>
-      </dataSource>
-    </environment>
-  </environments>
+    <environments default="development">
+        <environment id="development">
+            <transactionManager type="JDBC"/>
+            <dataSource type="POOLED">
+                <property name="driver" value="${jdbc.driverClass}"/>
+                <property name="url" value="${jdbc.jdbcUrl}"/>
+                <property name="username" value="${jdbc.user}"/>
+                <property name="password" value="${jdbc.password}"/>
+            </dataSource>
+        </environment>
+    </environments>
+  
   <mappers>
-    <mapper class="com.mybatis.entity.UserMapper"/>
-    <mapper resource="com/mybatis/entity/BlogMapper.xml"/>
+    <mapper class="com.pramy.mapper.UserMapper"/>
+    <mapper resource="com/pramy/mapper/UserMapper.xml"/>
     <mapper url="file:///E:/UserMapper.xml"/> 
-    <package name="com.mybatis.entity.mapperinterface"/>  
+    <package name="${mapperLocation}"/> 
   </mappers>
 </configuration>
 ```
+
+##    同目录下的db.properties
+
+```xml
+jdbc.driverClass=com.mysql.jdbc.Driver
+jdbc.jdbcUrl=jdbc:mysql://localhost:3306/test
+jdbc.user=root
+jdbc.password=root
+
+
+moduleLocation=com.pramy.module
+mapperLocation=com.pramy.mapper
+```
+
+**用db.properties的好处就是可以统一路径，修改方便，那么配置文件就可以直接用EL表达式来获取值**
+
+
 
 1.```typeAliases```是指定bean别名，如果再这里配置好bean的别名，然后在后面的**BeanMapper.xml**中**ResultType**可以直接填别名。
 
@@ -83,3 +104,30 @@
 2.```parameterType```指定传入参数的类型，```resultType```是返回值的类型，如果有在conf.xml中指定typeAliases的话，这里就可以用别名，如果没有，就得用**全类名**
 
 3.#{name}是一个占位符
+
+# 三 创建SqlSession
+
+使用了工厂设计模式，最好用静态代码块去加载SqlSessionFactory，用到的Resource是**org.apache.ibatis.io.Resources**
+
+```java
+Reader reader = Resources.getResourceAsReader("mybatisConfig.xml");
+SessionFactory sessionFactory = new SqlSessionFactoryBuilder().build(reader);
+SqlSession sqlSession = sessionFactory.openSession();
+//这默认是手动提交 后面要sqlSession.commit才提交数据，设置为true就会自动提交
+```
+
+
+
+获得SqlSeesion**(以后要细看源码实现方式)**
+
+然后通过反射来加载和绑定beanMapper
+
+```java
+ UserMapper userMapper = session.getMapper(UserMapper.class);
+        userMapper.insert(user);
+```
+
+其中UserMapper是一个interface，绑定了userMapper.xml**（问题：实现原理。实现过程）**
+
+ 
+
