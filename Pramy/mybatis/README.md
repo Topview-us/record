@@ -183,46 +183,97 @@ public SqlSessionFactory build(Reader reader, String environment, Properties pro
   }
 ```
 
-### XMLMapperBuilder
 
 
+### XMLConfigureBuile
 
-XMLMapperBuilder里面有几个成员变量：
+里面有一个加载xml的方法
 
 ```java
-  private XPathParser parser; //下面会讲到，里面储存着xml信息
-  private MapperBuilderAssistant builderAssistant;
-  private Map<String, XNode> sqlFragments;
-  private String resource;
+private void parseConfiguration(XNode root) {
+  try {
+    Properties settings = settingsAsPropertiess(root.evalNode("settings"));
+    //issue #117 read properties first
+    propertiesElement(root.evalNode("properties"));
+    loadCustomVfs(settings);
+    typeAliasesElement(root.evalNode("typeAliases"));
+    pluginElement(root.evalNode("plugins"));
+    objectFactoryElement(root.evalNode("objectFactory"));
+    objectWrapperFactoryElement(root.evalNode("objectWrapperFactory"));
+    reflectorFactoryElement(root.evalNode("reflectorFactory"));
+    settingsElement(settings);
+    // read it after objectFactory and objectWrapperFactory issue #631
+    environmentsElement(root.evalNode("environments"));
+    databaseIdProviderElement(root.evalNode("databaseIdProvider"));
+    typeHandlerElement(root.evalNode("typeHandlers"));
+    mapperElement(root.evalNode("mappers")); //这里开始注册beanMapper.xml
+  } catch (Exception e) {
+    throw new BuilderException("Error parsing SQL Mapper Configuration. Cause: " + e, e);
+  }
+}
 ```
 
-里面有很多构造方法我来看一个上面用到的构造方法
+构建configure要用到XMLConfigureBuiler对象里面用到一个方法
 
 ```java
-  public XMLConfigBuilder(Reader reader, String environment, Properties props) {
-    this(new XPathParser(reader, true, props, new XMLMapperEntityResolver()), environment, props);
+mapperElement(root.evalNode("mappers"));
+```
+
+向下找这个方法
+
+```java
+private void mapperElement(XNode parent) throws Exception {
+    if (parent != null) {
+      for (XNode child : parent.getChildren()) {
+        //先用检验是否用package方式来注册
+        if ("package".equals(child.getName())) {
+          //用（XNode）的方式去找package标签的value
+          String mapperPackage = child.getStringAttribute("name");
+          configuration.addMappers(mapperPackage);
+        } else {
+          //用（XNode）的方式去找resource标签的value
+          String resource = child.getStringAttribute("resource");
+          //用（XNode）的方式去找url标签的value
+          String url = child.getStringAttribute("url");
+          //用（XNode）的方式去找class标签的value
+          String mapperClass = child.getStringAttribute("class");
+          //然后再用resource加载，这里用到的是 断位与：&& （&&与&的区别）
+          if (resource != null && url == null && mapperClass == null) {
+            ErrorContext.instance().resource(resource);
+            InputStream inputStream = Resources.getResourceAsStream(resource);
+            XMLMapperBuilder mapperParser = new XMLMapperBuilder(inputStream, configuration, resource, configuration.getSqlFragments());
+            mapperParser.parse(); //这个方法开始读取beanMapp.xml
+            
+            //然后到url
+          } else if (resource == null && url != null && mapperClass == null) {
+            ErrorContext.instance().resource(url);
+            InputStream inputStream = Resources.getUrlAsStream(url);
+            XMLMapperBuilder mapperParser = new XMLMapperBuilder(inputStream, configuration, url, configuration.getSqlFragments());
+            mapperParser.parse(); //这个方法开始读取beanMapp.xml
+            
+          } else if (resource == null && url == null && mapperClass != null) {
+            //然后到class
+            Class<?> mapperInterface = Resources.classForName(mapperClass);
+            configuration.addMapper(mapperInterface);
+          } else {
+            throw new BuilderException("A mapper element may only specify a url, resource or class, but not more than one.");
+          }
+        }
+      }
+    }
   }
 ```
 
-### XPathParser对象中有几个成员变量
+**加载优先级package>resource>url>class**
 
-```java
-  private Document document;
-  private boolean validation;
-  private EntityResolver entityResolver;
-  private Properties variables;
-  private XPath xpath;
-```
+可以看出除了package和class是以```configuration.addMapper(mapperInterface)``` 方式来加载Mapper
 
-以Xpath构建node，最后以
-
-```java
-Node node =xpath.evaluate(root, document, returnType);
-```
+### XNode
 
 构建XNode的方式——它对应的内容是xml里面的内容
 
 ```java
+  //成员变量
   private Node node;
   private String name;
   private String body;
@@ -230,6 +281,7 @@ Node node =xpath.evaluate(root, document, returnType);
   private Properties variables;   
   private XPathParser xpathParser;
 
+//构建方法
 public XNode(XPathParser xpathParser, Node node, Properties variables) {
     this.xpathParser = xpathParser;
     this.node = node;
@@ -275,89 +327,12 @@ public XNode(XPathParser xpathParser, Node node, Properties variables) {
 
 所有信息存储：configure-->XMLConfigureBuiler-->XPathParser-->document-->xml
 
-然后调用
+然后一XNode的方法去一个个读取每一个根和它的值
+
+XNode是由node构建的，而node是以Xpath方式去构建的
 
 ```java
-private void parseConfiguration(XNode root) {
-  try {
-    Properties settings = settingsAsPropertiess(root.evalNode("settings"));
-    //issue #117 read properties first
-    propertiesElement(root.evalNode("properties"));
-    loadCustomVfs(settings);
-    typeAliasesElement(root.evalNode("typeAliases"));
-    pluginElement(root.evalNode("plugins"));
-    objectFactoryElement(root.evalNode("objectFactory"));
-    objectWrapperFactoryElement(root.evalNode("objectWrapperFactory"));
-    reflectorFactoryElement(root.evalNode("reflectorFactory"));
-    settingsElement(settings);
-    // read it after objectFactory and objectWrapperFactory issue #631
-    environmentsElement(root.evalNode("environments"));
-    databaseIdProviderElement(root.evalNode("databaseIdProvider"));
-    typeHandlerElement(root.evalNode("typeHandlers"));
-    mapperElement(root.evalNode("mappers")); //这里开始注册beanMapper.xml
-  } catch (Exception e) {
-    throw new BuilderException("Error parsing SQL Mapper Configuration. Cause: " + e, e);
-  }
-}
-```
-
-### XMLConfigureBuile
-
-构建configure要用到XMLConfigureBuiler对象里面用到一个方法
-
-```java
-mapperElement(root.evalNode("mappers"));
-```
-向下找这个方法
-
-```java
-private void mapperElement(XNode parent) throws Exception {
-    if (parent != null) {
-      for (XNode child : parent.getChildren()) {
-        //先用检验是否用package方式来注册
-        if ("package".equals(child.getName())) {
-          //用（XNode）的方式去找package标签的value
-          String mapperPackage = child.getStringAttribute("name");
-          configuration.addMappers(mapperPackage);
-        } else {
-          //用（XNode）的方式去找resource标签的value
-          String resource = child.getStringAttribute("resource");
-          //用（XNode）的方式去找url标签的value
-          String url = child.getStringAttribute("url");
-          //用（XNode）的方式去找class标签的value
-          String mapperClass = child.getStringAttribute("class");
-          //然后再用resource加载，这里用到的是 断位与：&& （&&与&的区别）
-          if (resource != null && url == null && mapperClass == null) {
-            ErrorContext.instance().resource(resource);
-            InputStream inputStream = Resources.getResourceAsStream(resource);
-            XMLMapperBuilder mapperParser = new XMLMapperBuilder(inputStream, configuration, resource, configuration.getSqlFragments());
-            mapperParser.parse();
-            //然后到url
-          } else if (resource == null && url != null && mapperClass == null) {
-            ErrorContext.instance().resource(url);
-            InputStream inputStream = Resources.getUrlAsStream(url);
-            XMLMapperBuilder mapperParser = new XMLMapperBuilder(inputStream, configuration, url, configuration.getSqlFragments());
-            mapperParser.parse();
-          } else if (resource == null && url == null && mapperClass != null) {
-            //然后到class
-            Class<?> mapperInterface = Resources.classForName(mapperClass);
-            configuration.addMapper(mapperInterface);
-          } else {
-            throw new BuilderException("A mapper element may only specify a url, resource or class, but not more than one.");
-          }
-        }
-      }
-    }
-  }
-```
-
-**加载优先级package>resource>url>class**
-
-可以看出除了package和class是以```configuration.addMapper(mapperInterface)``` 方式来加载Mapper
-
-```java
-XMLMapperBuilder mapperParser = new XMLMapperBuilder(inputStream, configuration, url, configuration.getSqlFragments());
-//configuration.getSqlFragments()得到的是一个Map<String, XNode>类型
+Node node =xpath.evaluate(root, document, returnType);
 ```
 
 
@@ -410,72 +385,10 @@ public void parse() {
 
 
 
-
-
-构建node
-
-```java
-Node node =xpath.evaluate("/mapper", document, returnType);
-```
+### 总结：通过把一个xml转成document，然后存在对象中，让后以一个个XNode对象去读取每一个元素，
 
 
 
-构建XNode的方式——它对应的内容是beanMapper.xml里面的内容
-
-```java
-  private Node node;
-  private String name;
-  private String body;
-  private Properties attributes;
-  private Properties variables;
-  private XPathParser xpathParser;
-
-public XNode(XPathParser xpathParser, Node node, Properties variables) {
-    this.xpathParser = xpathParser;
-    this.node = node;
-    this.name = node.getNodeName(); //获得的就是根节点 /mapper
-    this.variables = variables;
-    this.attributes = parseAttributes(node);
-    this.body = parseBody(node);
-  }
-
-//根节点的类型和值记住 
-  private Properties parseAttributes(Node n) {
-    Properties attributes = new Properties();
-    NamedNodeMap attributeNodes = n.getAttributes();
-    if (attributeNodes != null) {
-      for (int i = 0; i < attributeNodes.getLength(); i++) {
-        Node attribute = attributeNodes.item(i);
-        String value = PropertyParser.parse(attribute.getNodeValue(), variables);
-        attributes.put(attribute.getNodeName(), value);
-      }
-    }
-    return attributes;
-  }
-
-  private String parseBody(Node node) {
-    String data = getBodyData(node);
-    if (data == null) {
-      NodeList children = node.getChildNodes();
-      for (int i = 0; i < children.getLength(); i++) {
-        Node child = children.item(i);
-        data = getBodyData(child);
-        if (data != null) {
-          break;
-        }
-      }
-    }
-    return data;
-  }
-```
-
-在构造方法中调用了本身的几个方法去获得name，attributes，body
-
-
-
-
-
-总结：通过找到一个XNode（）
 
 
 ### 在mybatis的源码中有一个MapperRegistry(**映射器注册器**)
@@ -957,15 +870,30 @@ public abstract class TypeReference<T> {
 
 
 
+## 小问题讨论与发现：
+
+在不用到动态代理的时候：namespace可以随便定义。应为直接在sqlSession上使用Statement，没有涉及到代理。向下直接调用excute的方法与数据库交互。只要把module注册了就可以。
+
+```java
+sqlSession.selectOne(statement,parameter);
+```
+
+注册方式有两种。
+
+- ```java
+      <typeAliases>
+          <package name="${moduleLocation}"/>
+      </typeAliases>
+  ```
+
+  在typeAliases注册
+
+- 当你使用接interface的时候可以通过namespace去注册
 
 
 
-映射方法单独定义，是因为这里并不存在一个真正的类和方法供调用，只是通过反射和代理的原理来实现的假的调用，映射方法是调用的最小单位（独立个体），将映射方法定义之后，它就成为一个实实在在的存在，我们可以将调用过的方法保存到对应的映射器的缓存中，以供下次调用，避免每次调用相同的方法的时候都需要重新进行方法的生成。很明显，方法的生成比较复杂，会消耗一定的时间，将其保存在缓存集合中备用，可以极大的解决这种时耗问题。
+junit的实现原理
 
-明天再写吧······
+# 四  CURD
 
-
-
-
-
-# 四  CURL
+当bean和数据库别名不一样的时候用定义 < resultMap>标签来自定义返回结果集，当别名有冲突的时候
