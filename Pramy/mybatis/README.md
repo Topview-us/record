@@ -1083,3 +1083,32 @@ collection：如果传过来的是list就写list 是array就写array，是map就
 
 
 **如果有一个成立，则choose结束。**当choose中所有when的条件都不满则时，则执行otherwise中的sql。
+
+### 转义字符
+
+将语句中的位运算（与）”&“符使用“&amp;”替换
+
+mybatis配置文件写SQL语句的某些字符需要转义：
+
+```xml
+ 　 &lt;       < 
+    &gt;       >  
+    &lt;&gt;   <>
+    &amp;      & 
+    &apos;      '
+    &quot;      "
+```
+
+
+
+## 缓存机制
+
+默认开启一级缓存，生命周期是一个session，每一次查询到的内容会加入到缓存中，如果下次还有同样的操作就从缓存中取出，为了提高性能和节省资源
+
+有3个方法清空缓存
+
+> 1.如果执行了session.clearCache()的方法
+>
+> 2.执行了update，delete，insert
+>
+> 3.session.close()
