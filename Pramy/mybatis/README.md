@@ -99,7 +99,7 @@ mapperLocation=com.pramy.mapper
 </mapper> 
 ```
 
-1.**namespace**是指定该beanMapper.xml的位置
+1.**namespace**是指定该需要绑定的类的位置
 
 2.```parameterType```指定传入参数的类型，```resultType```是返回值的类型，如果有在conf.xml中指定typeAliases的话，这里就可以用别名，如果没有，就得用**全类名**
 
@@ -139,7 +139,7 @@ SqlSession sqlSession = sessionFactory.openSession();
     sqlSession.selectOne("com.pramy.UserMapper.selectByPrimaryKey",1)
     ```
 
-    ​通过namespace加id找到xml中的方法来实现。
+    ​通过namespace加id找到xml中的方法来实现。这种办法namespace不一定要指向接口类
 
   - 第二种：
 
