@@ -99,7 +99,7 @@ mapperLocation=com.pramy.mapper
 </mapper> 
 ```
 
-1.**namespace**是指定该beanMapper.xml的位置
+1.**namespace**是指定该需要绑定的类的位置
 
 2.```parameterType```指定传入参数的类型，```resultType```是返回值的类型，如果有在conf.xml中指定typeAliases的话，这里就可以用别名，如果没有，就得用**全类名**
 
@@ -139,7 +139,7 @@ SqlSession sqlSession = sessionFactory.openSession();
     sqlSession.selectOne("com.pramy.UserMapper.selectByPrimaryKey",1)
     ```
 
-    ​通过namespace加id找到xml中的方法来实现。
+    ​通过namespace加id找到xml中的方法来实现。这种办法namespace不一定要指向接口类
 
   - 第二种：
 
@@ -155,9 +155,343 @@ SqlSession sqlSession = sessionFactory.openSession();
 
 # 五  加载方式浅谈
 
-1.  在mybatis的源码中有一个MapperRegistry(**映射器注册器**)
 
-  ![1](image/1.png)
+
+## mybatis会从xml解析一系列参数到configure(org.apache.ibatis.session.configure)对象中.
+
+其中主要来研究一下Mapper的加载方式
+
+### 首先创建工厂的时候会回用到SqlSessionFactory的build方法
+
+```java
+public SqlSessionFactory build(Reader reader, String environment, Properties properties) {
+    try {
+      //这里的parser已经读取到mybatis的配置文件，下面开始讲怎么读
+      XMLConfigBuilder parser = new XMLConfigBuilder(reader, environment, properties);
+   
+      return build(parser.parse());
+    } catch (Exception e) {
+      throw ExceptionFactory.wrapException("Error building SqlSession.", e);
+    } finally {
+      ErrorContext.instance().reset();
+      try {
+        reader.close();
+      } catch (IOException e) {
+        // Intentionally ignore. Prefer previous error.
+      }
+    }
+  }
+```
+
+
+
+### XMLConfigureBuile
+
+里面有一个加载xml的方法
+
+```java
+private void parseConfiguration(XNode root) {
+  try {
+    Properties settings = settingsAsPropertiess(root.evalNode("settings"));
+    //issue #117 read properties first
+    propertiesElement(root.evalNode("properties"));
+    loadCustomVfs(settings);
+    typeAliasesElement(root.evalNode("typeAliases"));
+    pluginElement(root.evalNode("plugins"));
+    objectFactoryElement(root.evalNode("objectFactory"));
+    objectWrapperFactoryElement(root.evalNode("objectWrapperFactory"));
+    reflectorFactoryElement(root.evalNode("reflectorFactory"));
+    settingsElement(settings);
+    // read it after objectFactory and objectWrapperFactory issue #631
+    environmentsElement(root.evalNode("environments"));
+    databaseIdProviderElement(root.evalNode("databaseIdProvider"));
+    typeHandlerElement(root.evalNode("typeHandlers"));
+    mapperElement(root.evalNode("mappers")); //这里开始注册beanMapper.xml
+  } catch (Exception e) {
+    throw new BuilderException("Error parsing SQL Mapper Configuration. Cause: " + e, e);
+  }
+}
+```
+
+构建configure要用到XMLConfigureBuiler对象里面用到一个方法
+
+```java
+mapperElement(root.evalNode("mappers"));
+```
+
+向下找这个方法
+
+```java
+private void mapperElement(XNode parent) throws Exception {
+    if (parent != null) {
+      for (XNode child : parent.getChildren()) {
+        //先用检验是否用package方式来注册
+        if ("package".equals(child.getName())) {
+          //用（XNode）的方式去找package标签的value
+          String mapperPackage = child.getStringAttribute("name");
+          configuration.addMappers(mapperPackage);
+        } else {
+          //用（XNode）的方式去找resource标签的value
+          String resource = child.getStringAttribute("resource");
+          //用（XNode）的方式去找url标签的value
+          String url = child.getStringAttribute("url");
+          //用（XNode）的方式去找class标签的value
+          String mapperClass = child.getStringAttribute("class");
+          //然后再用resource加载，这里用到的是 断位与：&& （&&与&的区别）
+          if (resource != null && url == null && mapperClass == null) {
+            ErrorContext.instance().resource(resource);
+            InputStream inputStream = Resources.getResourceAsStream(resource);
+            XMLMapperBuilder mapperParser = new XMLMapperBuilder(inputStream, configuration, resource, configuration.getSqlFragments());
+            mapperParser.parse(); //这个方法开始读取beanMapp.xml
+            
+            //然后到url
+          } else if (resource == null && url != null && mapperClass == null) {
+            ErrorContext.instance().resource(url);
+            InputStream inputStream = Resources.getUrlAsStream(url);
+            XMLMapperBuilder mapperParser = new XMLMapperBuilder(inputStream, configuration, url, configuration.getSqlFragments());
+            mapperParser.parse(); //这个方法开始读取beanMapp.xml
+            
+          } else if (resource == null && url == null && mapperClass != null) {
+            //然后到class
+            Class<?> mapperInterface = Resources.classForName(mapperClass);
+            configuration.addMapper(mapperInterface);
+          } else {
+            throw new BuilderException("A mapper element may only specify a url, resource or class, but not more than one.");
+          }
+        }
+      }
+    }
+  }
+```
+
+**加载优先级package>resource>url>class**
+
+可以看出除了package和class是以```configuration.addMapper(mapperInterface)``` 方式来加载Mapper
+
+### XNode
+
+构建XNode的方式——它对应的内容是xml里面的内容
+
+```java
+  //成员变量
+  private Node node;
+  private String name;
+  private String body;
+  private Properties attributes;
+  private Properties variables;   
+  private XPathParser xpathParser;
+
+//构建方法
+public XNode(XPathParser xpathParser, Node node, Properties variables) {
+    this.xpathParser = xpathParser;
+    this.node = node;
+    this.name = node.getNodeName(); //获得的就是根节点 
+    this.variables = variables;
+    this.attributes = parseAttributes(node);
+    this.body = parseBody(node);
+  }
+
+//根节点的类型和值记住 
+  private Properties parseAttributes(Node n) {
+    Properties attributes = new Properties();
+    NamedNodeMap attributeNodes = n.getAttributes();
+    if (attributeNodes != null) {
+      for (int i = 0; i < attributeNodes.getLength(); i++) {
+        Node attribute = attributeNodes.item(i);
+        String value = PropertyParser.parse(attribute.getNodeValue(), variables);
+        attributes.put(attribute.getNodeName(), value);
+      }
+    }
+    return attributes;
+  }
+
+  private String parseBody(Node node) {
+    String data = getBodyData(node);
+    if (data == null) {
+      NodeList children = node.getChildNodes();
+      for (int i = 0; i < children.getLength(); i++) {
+        Node child = children.item(i);
+        data = getBodyData(child);
+        if (data != null) {
+          break;
+        }
+      }
+    }
+    return data;
+  }
+```
+
+在构造方法中调用了本身的几个方法去获得name，attributes，body
+
+这个document是通过parse模块来把xml转成document，从而将信息存在在document中，回到XMLMapperBuilder
+
+所有信息存储：configure-->XMLConfigureBuiler-->XPathParser-->document-->xml
+
+然后一XNode的方法去一个个读取每一个根和它的值
+
+XNode是由node构建的，而node是以Xpath方式去构建的
+
+```java
+Node node =xpath.evaluate(root, document, returnType);
+```
+
+
+
+### XMLMapperBuilder
+
+
+
+#### configure里面的 mapperElement方法构建完XMLMapperBuilder后，执行XMLMapperBuilder的parse()方法，这个方法又调用parser（XPathParser）的evalNode方法
+
+```java
+//这个方法是根据：resourcse去加载beanMapper.xml，通过namespace绑定接口
+
+
+public void parse() {
+    if (!configuration.isResourceLoaded(resource)) {
+      //parser.evalNode("/mapper")返回来的是一个XNode类,由Node类构建，而Node又以Xpath方式去以根节点（/mapper）+document去构建。
+      configurationElement(parser.evalNode("/mapper"));
+      configuration.addLoadedResource(resource);
+      //绑定的的最开始入口
+      bindMapperForNamespace();
+    }
+	
+    parsePendingResultMaps();
+    parsePendingChacheRefs();
+    parsePendingStatements();
+  }
+//绑定的方法
+  private void bindMapperForNamespace() {
+    String namespace = builderAssistant.getCurrentNamespace();
+    if (namespace != null) {
+      Class<?> boundType = null;
+      try {
+        boundType = Resources.classForName(namespace);
+      } catch (ClassNotFoundException e) {
+        //ignore, bound type is not required
+      }
+      if (boundType != null) {
+        if (!configuration.hasMapper(boundType)) {
+          // Spring may not know the real resource name so we set a flag
+          // to prevent loading again this resource from the mapper interface
+          // look at MapperAnnotationBuilder#loadXmlResource
+          configuration.addLoadedResource("namespace:" + namespace);
+          configuration.addMapper(boundType);
+        }
+      }
+    }
+  }
+```
+
+
+
+### 总结：通过把一个xml转成document，然后存在对象中，让后以一个个XNode对象去读取每一个元素，
+
+
+
+
+
+### 在mybatis的源码中有一个MapperRegistry(**映射器注册器**)
+
+  ```java
+
+package org.apache.ibatis.binding;
+
+import org.apache.ibatis.builder.annotation.MapperAnnotationBuilder;
+import org.apache.ibatis.io.ResolverUtil;
+import org.apache.ibatis.session.Configuration;
+import org.apache.ibatis.session.SqlSession;
+
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+
+/**
+ * @author Clinton Begin
+ * @author Eduardo Macarron
+ * @author Lasse Voss
+ */
+public class MapperRegistry {
+
+  private final Configuration config;
+  private final Map<Class<?>, MapperProxyFactory<?>> knownMappers = new HashMap<Class<?>, MapperProxyFactory<?>>();
+
+  public MapperRegistry(Configuration config) {
+    this.config = config;
+  }
+
+  @SuppressWarnings("unchecked")
+  public <T> T getMapper(Class<T> type, SqlSession sqlSession) {
+    final MapperProxyFactory<T> mapperProxyFactory = (MapperProxyFactory<T>) knownMappers.get(type);
+    if (mapperProxyFactory == null) {
+      throw new BindingException("Type " + type + " is not known to the MapperRegistry.");
+    }
+    try {
+      return mapperProxyFactory.newInstance(sqlSession);
+    } catch (Exception e) {
+      throw new BindingException("Error getting mapper instance. Cause: " + e, e);
+    }
+  }
+  
+  public <T> boolean hasMapper(Class<T> type) {
+    return knownMappers.containsKey(type);
+  }
+
+  public <T> void addMapper(Class<T> type) {
+    if (type.isInterface()) {
+      if (hasMapper(type)) {
+        throw new BindingException("Type " + type + " is already known to the MapperRegistry.");
+      }
+      boolean loadCompleted = false;
+      try {
+        knownMappers.put(type, new MapperProxyFactory<T>(type));
+        // It's important that the type is added before the parser is run
+        // otherwise the binding may automatically be attempted by the
+        // mapper parser. If the type is already known, it won't try.
+        MapperAnnotationBuilder parser = new MapperAnnotationBuilder(config, type);
+        parser.parse();
+        loadCompleted = true;
+      } finally {
+        if (!loadCompleted) {
+          knownMappers.remove(type);
+        }
+      }
+    }
+  }
+
+  /**
+   * @since 3.2.2
+   */
+  public Collection<Class<?>> getMappers() {
+    return Collections.unmodifiableCollection(knownMappers.keySet());
+  }
+
+  /**
+   * @since 3.2.2
+   */
+  public void addMappers(String packageName, Class<?> superType) {
+    ResolverUtil<Class<?>> resolverUtil = new ResolverUtil<Class<?>>();
+    resolverUtil.find(new ResolverUtil.IsA(superType), packageName);
+    Set<Class<? extends Class<?>>> mapperSet = resolverUtil.getClasses();
+    for (Class<?> mapperClass : mapperSet) {
+      addMapper(mapperClass);
+    }
+  }
+
+  /**
+   * @since 3.2.2
+   */
+  public void addMappers(String packageName) {
+    addMappers(packageName, Object.class);
+  }
+  
+}
+
+  ```
+
+
 
   源码中有一段
 
@@ -171,7 +505,31 @@ SqlSession sqlSession = sessionFactory.openSession();
 
 **1.addMapper:添加**
 
-![2](image/2.png)
+```java
+public <T> void addMapper(Class<T> type) {
+    if (type.isInterface()) {
+      if (hasMapper(type)) {
+        throw new BindingException("Type " + type + " is already known to the MapperRegistry.");
+      }
+      boolean loadCompleted = false;
+      try {
+        //创建工厂
+        knownMappers.put(type, new MapperProxyFactory<T>(type));
+		//根据接口名寻找同包下同名的xml或者mapper的namespace是该接口的xml
+        //找到对用的xml后进行解析mapper节点里面的节点
+        MapperAnnotationBuilder parser = new MapperAnnotationBuilder(config, type);
+        parser.parse();
+        loadCompleted = true;
+      } finally {
+        if (!loadCompleted) {
+          knownMappers.remove(type);
+        }
+      }
+    }
+  }
+```
+
+
 
 源码中会捕获从xml扫描过来的注册器，规定只有接口类型的class才会被添加，如果这个注册器重复了，会报错。
 
@@ -187,15 +545,34 @@ this.knownMappers.put(type, new MapperProxyFactory(type));
 
 **2.addMappers(String packageName, Class<?> superType) :查找包下所有是superType的类**
 
-![4](image/4.png)
+```java
+  public void addMappers(String packageName, Class<?> superType) {
+    ResolverUtil<Class<?>> resolverUtil = new ResolverUtil<Class<?>>();
+    resolverUtil.find(new ResolverUtil.IsA(superType), packageName);
+    Set<Class<? extends Class<?>>> mapperSet = resolverUtil.getClasses();
+    for (Class<?> mapperClass : mapperSet) {
+      addMapper(mapperClass);
+    }
+  }
+```
+
+
 
 **3 .addMappers(String packageName):查找包下的所有类**
 
-![5](image/5.png)
+```java
+  public void addMappers(String packageName) {
+    addMappers(packageName, Object.class);
+  }
+```
+
+
 
 可以看出3调用2，2调用1,所以方法1才是最核心的东西
 
 然而方法3中带了一个参数object.class 调用2，得到的结果就是该包下的所有类都可以添加，因为所有的类都是object的子类，所以在方法2中针对每一个类继续调用方法1。确认是接口类并且没有重发之后就会添加到注册器中；一开始给定一个标志**loadCompleted**一开始没有加载完成所以默认为false，如果添加完成后就把它置为true；如果失败了，就会在finally里面从**knownMappers**中删除
+
+
 
 ## 回顾一下mybatisConfig.xml中的Mapper中的几个标签：
 
@@ -205,7 +582,7 @@ this.knownMappers.put(type, new MapperProxyFactory(type));
 
   SqlSessionFactoryBean实际上对应的是SqlSessionFactory类，它会扫描sql xml文件，并对接口创建动态代理，将接口类的Class和动态代理关系保存在SqlSessionFactory中，这仅仅是完成了动态代理的生成，而动态代理在哪里被使用到，怎么使用，这些都是由MapperScannerConfigurer完成，接下来看看MapperScannerConfigurer都做了些什么？
 
-4 在**MapperRegistry**映射器注册器中有一个**getMapper()**方法
+### 在MapperRegistry映射器注册器中有一个getMapper()方法
 
 ![6](image/6.png)
 
@@ -213,7 +590,7 @@ this.knownMappers.put(type, new MapperProxyFactory(type));
 
 
 
-5  MapperProxyFactory
+###   MapperProxyFactory 映射器代理工厂
 
 ![3](image/3.png)
 
@@ -227,12 +604,296 @@ this.knownMappers.put(type, new MapperProxyFactory(type));
 
 在这个代理工厂中定义了一个缓存集合，其实为了调用MapperProxy的构造器而设，这个缓存集合用于保存当前映射器中的映射方法的。
 
-映射方法单独定义，是因为这里并不存在一个真正的类和方法供调用，只是通过反射和代理的原理来实现的假的调用，映射方法是调用的最小单位（独立个体），将映射方法定义之后，它就成为一个实实在在的存在，我们可以将调用过的方法保存到对应的映射器的缓存中，以供下次调用，避免每次调用相同的方法的时候都需要重新进行方法的生成。很明显，方法的生成比较复杂，会消耗一定的时间，将其保存在缓存集合中备用，可以极大的解决这种时耗问题。
+### MapperProxy 映射器代理
 
-明天再写吧······
+```java
+package org.apache.ibatis.binding;
+
+import java.io.Serializable;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.util.Map;
+
+import org.apache.ibatis.reflection.ExceptionUtil;
+import org.apache.ibatis.session.SqlSession;
+
+/**
+ * @author Clinton Begin
+ * @author Eduardo Macarron
+ */
+public class MapperProxy<T> implements InvocationHandler, Serializable {
+
+  private static final long serialVersionUID = -6424540398559729838L;
+  private final SqlSession sqlSession;
+  private final Class<T> mapperInterface;
+  private final Map<Method, MapperMethod> methodCache;
+
+  public MapperProxy(SqlSession sqlSession, Class<T> mapperInterface, Map<Method, MapperMethod> methodCache) {
+    this.sqlSession = sqlSession;
+    this.mapperInterface = mapperInterface;
+    this.methodCache = methodCache;
+  }
+
+  //代理以后实体类调用什么方法是都是执行invoke方法
+  @Override
+  public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+    if (Object.class.equals(method.getDeclaringClass())) {
+      try {
+        return method.invoke(this, args);
+      } catch (Throwable t) {
+        throw ExceptionUtil.unwrapThrowable(t);
+      }
+    }
+    final MapperMethod mapperMethod = cachedMapperMethod(method);
+    return mapperMethod.execute(sqlSession, args);
+  }
+
+  private MapperMethod cachedMapperMethod(Method method) {
+    //这是是从methodCache(一个Map，用来做缓存区)找这个方法。如果没有才new出来，提高了效率
+    MapperMethod mapperMethod = methodCache.get(method);
+    if (mapperMethod == null) {
+      mapperMethod = new MapperMethod(mapperInterface, method, sqlSession.getConfiguration());
+      methodCache.put(method, mapperMethod);
+    }
+    return mapperMethod;
+  }
+
+}
+
+```
+
+### MapperMethod  方法映射器
+
+（待定）
 
 
 
 
 
-# 四  CURL
+
+
+### typeAliases标签--->TypeAliasRegistry（注册器）
+
+```java
+private final Map<String, Class<?>> TYPE_ALIASES = new HashMap<String, Class<?>>();
+```
+
+也是通过注册器来实现，有5个方法，前3个方法方法和MapperRegistry大同小异，
+
+有两个方法进行注册
+
+**package：1-->2-->3-->4**
+
+**alis:5-->4**
+
+
+
+```java
+//1
+  public void registerAliases(String packageName){
+    registerAliases(packageName, Object.class);
+  }
+//2
+  public void registerAliases(String packageName, Class<?> superType){
+    ResolverUtil<Class<?>> resolverUtil = new ResolverUtil<Class<?>>();
+    resolverUtil.find(new ResolverUtil.IsA(superType), packageName);
+    Set<Class<? extends Class<?>>> typeSet = resolverUtil.getClasses();
+    for(Class<?> type : typeSet){
+      // Ignore inner classes and interfaces (including package-info.java)
+      // Skip also inner classes. See issue #6
+      if (!type.isAnonymousClass() && !type.isInterface() && !type.isMemberClass()) {
+        registerAlias(type);
+      }
+    }
+  }
+//3
+  public void registerAlias(Class<?> type) {
+    String alias = type.getSimpleName();
+    Alias aliasAnnotation = type.getAnnotation(Alias.class);
+    if (aliasAnnotation != null) {
+      alias = aliasAnnotation.value();
+    } 
+    registerAlias(alias, type);
+  }
+//4最核心的方法
+  public void registerAlias(String alias, Class<?> value) {
+    if (alias == null) {
+      throw new TypeException("The parameter alias cannot be null");
+    }
+    // 这里看到，你在xml所写的别名都会转为小写
+    String key = alias.toLowerCase(Locale.ENGLISH);
+    if (TYPE_ALIASES.containsKey(key) && TYPE_ALIASES.get(key) != null && !TYPE_ALIASES.get(key).equals(value)) {
+      throw new TypeException("The alias '" + alias + "' is already mapped to the value '" + TYPE_ALIASES.get(key).getName() + "'.");
+    }
+    TYPE_ALIASES.put(key, value);  //此处进行类型注册
+  }
+//5
+  public void registerAlias(String alias, String value) {
+    try {
+      registerAlias(alias, Resources.classForName(value));
+    } catch (ClassNotFoundException e) {
+      throw new TypeException("Error registering type alias "+alias+" for "+value+". Cause: " + e, e);
+    }
+  }
+```
+
+这类的构造方法里面调用方法1给我们注册了许多默认的类型，例如int string long。
+
+---
+
+
+
+里面还有一个找到class的方法
+
+```java
+  public <T> Class<T> resolveAlias(String string) {
+    try {
+      if (string == null) {
+        return null;
+      }
+      // 全小写
+      String key = string.toLowerCase(Locale.ENGLISH);
+      Class<T> value;
+      //如果注册器（map）中有这个类
+      if (TYPE_ALIASES.containsKey(key)) {
+        //从注册器中找
+        value = (Class<T>) TYPE_ALIASES.get(key);
+      } else {
+        //如果没有就从 org.apache.ibatis.io.Resources这个类中建造一个
+        value = (Class<T>) Resources.classForName(string);
+      }
+      return value;
+    } catch (ClassNotFoundException e) {
+      throw new TypeException("Could not resolve type alias '" + string + "'.  Cause: " + e, e);
+    }
+  }
+```
+
+**org.apache.ibatis.io.Resources;**里面的classForName方法
+
+```java
+  public static Class<?> classForName(String className) throws ClassNotFoundException {
+    //用jdk的加载器去加载这个类
+    return classLoaderWrapper.classForName(className);
+  }
+```
+
+
+
+### TypeHandlerReister(类型注册器)
+
+里面有三个成员变量
+
+```java
+private final Map<JdbcType, TypeHandler<?>> JDBC_TYPE_HANDLER_MAP = new EnumMap<JdbcType, TypeHandler<?>>(JdbcType.class);
+
+private final Map<Type, Map<JdbcType, TypeHandler<?>>> TYPE_HANDLER_MAP = new HashMap<Type, Map<JdbcType, TypeHandler<?>>>();
+
+private final Map<Class<?>, TypeHandler<?>> ALL_TYPE_HANDLERS_MAP = new HashMap<Class<?>, TypeHandler<?>>();
+```
+
+- 第一种**JDBC_TYPE_HANDLER_MAP**：是一种枚举Map，这种Map先天存在key，而key就是数据库类型，用来写入数据库
+- 第二种**TYPE_HANDLER_MAP**，是一个嵌套Map，里面的Ma就是第一种，外面的Map的key就是java类型，这就相当于javaType-jdbcType一一对应。
+- 第三种**ALL_TYPE_HANDLERS_MAP**，虽然我不是很明白什么意思，不过看名字应该是保存所有的注册器
+
+### TypeReference（用于获取原生类）
+
+```java
+
+package org.apache.ibatis.type;
+
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+
+/**
+ * References a generic type.
+ *
+ * @param <T> the referenced type
+ * @since 3.1.0
+ * @author Simone Tripodi
+ */
+public abstract class TypeReference<T> {
+
+  private final Type rawType;
+
+  protected TypeReference() {
+    //构造方法中调用，自身的方法,把自己的class传进去
+    rawType = getSuperclassTypeParameter(getClass());
+  }
+
+  
+ //核心方法
+  Type getSuperclassTypeParameter(Class<?> clazz) {
+    //用自身的class调用getGenericSuperclass()来获取直接带参数的类，即泛型类T
+    Type genericSuperclass = clazz.getGenericSuperclass();
+    
+    /*由于每一个类都是Class类的子类，而Class本身也是一个类，但是它又是所有类的父类,查阅资料的到Class的实例表示的是在一个运行的应用中的所有类和接口，所以Class类的实类就是借口与类。jdk里面规定了，只有泛型不属于Class类（具体我也不清楚）*/
+ =========================   
+    if (genericSuperclass instanceof Class) {
+      
+      //如果父类又不是TypeReference就向下递归找到参数类
+      if (TypeReference.class != genericSuperclass) {
+        return getSuperclassTypeParameter(clazz.getSuperclass());
+      }
+
+      //如果是TypeReference，这里TypeException有一个内部的构造方法，把TypeReference类传进去，在里面如果不是TypeReference类型，就没事，继续递归，如果不是就抛异常，说明程序出错了
+      throw new TypeException("'" + getClass() + "' extends TypeReference but misses the type parameter. "
+        + "Remove the extension or add a type parameter to it.");
+    }
+===========================
+    
+    //如果找到泛型类了。就钱转它的子类ParameterizedType，既参数化，然后获取实际的参数，获取泛型的参数类型，可能参数不止一个，所以获取第一个
+    
+    Type rawType = ((ParameterizedType) genericSuperclass).getActualTypeArguments()[0];
+    // TODO remove this when Reflector is fixed to return Types
+    if (rawType instanceof ParameterizedType) {
+      rawType = ((ParameterizedType) rawType).getRawType();
+    }
+
+    return rawType;
+  }
+
+  public final Type getRawType() {
+    return rawType;
+  }
+
+  @Override
+  public String toString() {
+    return rawType.toString();
+  }
+
+}
+
+```
+
+在type下面还有很多类型处理器，不想看了
+
+
+
+## 小问题讨论与发现：
+
+在不用到动态代理的时候：namespace可以随便定义。应为直接在sqlSession上使用Statement，没有涉及到代理。向下直接调用excute的方法与数据库交互。只要把module注册了就可以。
+
+```java
+sqlSession.selectOne(statement,parameter);
+```
+
+注册方式有两种。
+
+- ```java
+      <typeAliases>
+          <package name="${moduleLocation}"/>
+      </typeAliases>
+  ```
+
+  在typeAliases注册
+
+- 当你使用接interface的时候可以通过namespace去注册
+
+
+
+junit的实现原理
+
+# 四  CURD
+
+当bean和数据库别名不一样的时候用定义 < resultMap>标签来自定义返回结果集，当别名有冲突的时候
