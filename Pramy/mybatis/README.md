@@ -896,4 +896,190 @@ junit的实现原理
 
 # 四  CURD
 
+### 单表查询
+
+ 当接口返回类型是一个object的时候，mybatis是在查询的时候如果返回多个数据，会抛异常，因为mybatis是默认使用selectOne()的方法
+
+```xml
+    <select id="selectAll" resultType="User">
+      SELECT * FROM user
+    </select>
+```
+
+如果要查询多个同一类的object的话，就必须在**接口类** 声明返回值是list
+
+
+
 当bean和数据库别名不一样的时候用定义 < resultMap>标签来自定义返回结果集，当别名有冲突的时候
+
+```xml
+    <resultMap id="selectMap" type="Classes">
+        <id property="cId" column="c_id"/>
+        <result property="cName" column="c_name"/>
+        <result property="teacherId" column="teacher_id"/>
+    </resultMap>
+
+    <select id="select"  resultMap="selectMap">
+        SELECT * FROM  classes
+    </select>
+```
+
+标签resultMap的id一定要跟下面select标签的 resultMap的value相同
+
+里面的标签id 对应着主键，property对应po类的字段 column对应数据库字段
+
+
+
+### 一对一查询（班级——老师）
+
+##### 连表查询
+
+```xml
+    <resultMap id="selectMap" type="Classes">
+        <id property="cId" column="c_id"/>
+        <result property="cName" column="c_name"/>
+        <association property="teacher" javaType="Teacher">
+            <id property="tId" column="t_id"></id>
+            <result property="tName" column="t_name"></result>
+        </association>
+    </resultMap>
+
+    <select id="select"  parameterType="int" resultMap="selectMap">
+        SELECT * FROM  classes c,teacher t WHERE c.teacher_id=t.t_id AND c.c_id=#{id}
+    </select>
+```
+
+Class对象成员标量的定义
+
+```java
+    private Integer cId;
+    private String cName;
+    private Teacher teacher;
+```
+
+由于我们里面有一个对象所以我们要在resultMap里用association来定义Teacher对象的打包方式，property依然是 成员变量，JavaType的指定打包类型
+
+##### 执行两次Sql
+
+```xml
+    <resultMap id="select2Map" type="Classes">
+        <id property="cId" column="c_id"/>
+        <result property="cName" column="c_name"/>
+        <association property="teacher"  column="teacher_id" select="selectTeacher">
+        </association>
+    </resultMap>
+
+    <select id="selectClasses" parameterType="int" resultMap="select2Map">
+        SELECT * FROM classes WHERE c_id = #{c_id}
+    </select>
+
+    <select id="selectTeacher" parameterType="int" resultType="com.pramy.module.Teacher">
+        SELECT t_id tId,t_name tName FROM teacher WHERE t_id=#{id}
+    </select>
+```
+
+分析：在执行selectClasses的过程中会执行select2Map,在select2Map中指定成员变量teacher 的类型 和column() ，然后根据查询的到的sql字段中的teacher_id，把它作为参数再执行selectTeacher（注意名称），然后返回一个Teacher对象储存在Classes对象中
+
+### 一对多查询(班级——老师——学生)
+
+```xml
+    <select id="selectClasses3" parameterType="int" resultMap="selectClasses3">
+        SELECT * FROM classes c,teacher t,student s WHERE t.t_id=c.teacher_id AND c.c_id=s.class_id AND c.c_id=#{id}
+    </select>
+
+    <resultMap id="selectClasses3" type="com.pramy.module.Classes">
+        <id property="cId" column="c_id"/>
+        <result property="cName" column="c_name"/>
+        <association property="teacher" javaType="com.pramy.module.Teacher" >
+            <id property="tId" column="t_id"/>
+            <result property="tName" column="t_name"/>
+        </association>
+        <collection property="list"  ofType="com.pramy.module.Student">
+            <id property="id" column="s_id"/>
+            <result property="name" column="s_name"/>
+        </collection>
+    </resultMap>
+```
+
+就是多了一个collection来封装集合，ofType：指定容器装的类型
+
+
+
+## 动态Sql查询
+
+### 1.if标签
+
+```xml
+<if test=""> </if>    条件判断
+```
+
+在做模糊查询的时候可以写成这样
+
+```xml
+        <if test='cName!="null"' >
+            WHERE c_name LIKE concat(concat('%',#{cName}),'%') //sql本身的字符串拼接
+        </if>
+```
+
+或者这样
+
+```xml
+        <if test='cName!="null"' >
+            WHERE c_name LIKE '%${cName}%'
+        </if>
+```
+
+
+
+#### 2.where,trim,set标签
+
+```xml
+           select * from classes 
+           <where>
+               <if test="cId != null">
+                   c_id=#{cId}
+               </if>
+               and cName='b';
+           </where>
+```
+
+- where标签可以处理前缀的AND 和 OR 
+- set可以处理后缀的逗号
+- trim自定义标签
+
+
+
+
+
+### foreach标签
+
+```xml
+  <foreach item="item" index="index" collection="list"
+      open="(" separator="," close=")">
+        #{item}
+  </foreach>
+```
+
+collection：如果传过来的是list就写list 是array就写array，是map就写map
+
+
+
+### choose 标签
+
+```xml
+<choose>
+	<when>
+ 	······	 
+  	</when>
+  	<when>
+  	·······
+  	</when>
+  	<otherwise>
+	·····
+     </otherwise>
+</choose>
+```
+
+
+
+**如果有一个成立，则choose结束。**当choose中所有when的条件都不满则时，则执行otherwise中的sql。
