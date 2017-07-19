@@ -148,3 +148,27 @@ public class Boss {
 }
 ```
 
+# 三 接口的好处
+
+```java
+interface A
+class B implements A, class C implements A
+```
+
+B 和C 需要实现A接口的方法；根据需要可以在B,C的实现方法中写不同的逻辑
+
+在xml中正常配置，记住，在配置文件中的class必须是实实在在的class。接口不行
+
+```xml
+<bean id="id" class="com.pramy.po.B"/>
+<!--两个二选-->
+<bean id="id" class="com.pramy.po.C"/>
+```
+
+```java
+ ApplicationContext ctx =new ClassPathXmlApplicationContext(locations);
+ A a = (A)ctx.getBean("id");//强转接口
+a.action
+ //这样子就可以通过在xml配置可以让接口A去实现B类的逻辑方法，或者C类的逻辑方法，达到降低耦合度的效果
+```
+
