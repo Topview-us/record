@@ -1112,3 +1112,67 @@ mybatis配置文件写SQL语句的某些字符需要转义：
 > 2.执行了update，delete，insert
 >
 > 3.session.close()
+
+# 实践问题：
+
+- 用接口的时候用package的时候要统一路径
+
+- sqlSession用完记得关闭
+
+- 传两个参数的办法
+
+  ```java
+
+  List<Section> selectList(@Param("section") Section section, @Param("page")PageUtil page);
+  ```
+
+  ```xml
+  //对应的xml配置
+  <select id="selectList"  resultMap="BaseResultMap">
+      SELECT
+      <include refid="Base_Column_List"/>
+      FROM section
+      <where>
+        <if test="section.sectionName!=null">
+          <trim prefix="(" suffix=")" prefixOverrides="or">
+            or section_name like concat(concat('%',#{section.sectionName}),'%')
+            or creat_time like concat(concat('%',#{section.sectionName}),'%')
+            or creater_name like concat(concat('%',#{section.sectionName}),'%')
+          </trim>
+        </if>
+      </where>
+      ORDER BY creater_name desc
+      <if test="page.pageSize!=0">
+        limit #{page.index} , #{page.pageSize}
+      </if>
+    </select>
+    <resultMap id="BaseResultMap" type="com.pramy.module.Section">
+      <constructor>
+        <idArg column="id" javaType="java.lang.Integer" jdbcType="INTEGER" />
+        <arg column="section_name" javaType="java.lang.String" jdbcType="VARCHAR" />
+        <arg column="creat_time" javaType="java.util.Date" jdbcType="TIMESTAMP" />
+        <arg column="level" javaType="java.lang.Integer" jdbcType="INTEGER" />
+        <arg column="creater_name" javaType="java.lang.String" jdbcType="VARCHAR" />
+      </constructor>
+    </resultMap>
+  ```
+
+  千万千万要注意sql，写错了会很麻烦
+
+  当错误提示显示**not getter for **
+
+  ### 这里千万要注意
+
+  - 如果是一个参数对象，绝对不能用**参数名+成员变量 **来取值
+  - 如果是两个参数最好的办法就是家注解，但是要获取某一个参数对象的成员变量的值，一定要要用参数名（注解写的名字）+成员变量
+
+  ```java
+  public static Date getDateBefore(Date d, int day) {  
+          Calendar now = Calendar.getInstance();  
+          now.setTime(d);  
+          now.set(Calendar.DATE, now.get(Calendar.DATE) - day);  //获得前几天的日期
+          return now.getTime();  
+      } 
+  ```
+
+  ​
