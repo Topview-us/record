@@ -22,7 +22,6 @@
         <mapper resource="mapper/User.xml" />
     </mappers>
 </configuration>
-
 ```
 - environments:  
     - deveiopment 开发模式
@@ -424,6 +423,8 @@ id表示主键，其他的用result标识
 
 - collection中对应的colum有毒，目前来看如果搜索的多张表中有相同字段，那么该字段对应的应该是在sql搜索语句中含有该字段的第一张表
 
+- 在接口中如果只是指定返回类型为List，则会返回ArrayList
+
 ## 动态sql和模糊搜索
 
 1. 创建查询条件实体类，eg：
@@ -510,7 +511,7 @@ private int maxAge;
 
 - 缓存：	
   1. 映射语句文件中的所有 select 语句将会被缓存。
-  2.  映射语句文件中的所有 insert，update 和 delete 语句会刷新缓存。
+  2. 映射语句文件中的所有 insert，update 和 delete 语句会刷新缓存。
   3. 缓存会使用 Least Recently Used（LRU，最近最少使用的）算法来收回。
   4. 缓存会根据指定的时间间隔来刷新。
   5. 缓存会存储 1024 个对象
@@ -688,4 +689,13 @@ private int maxAge;
    }
    ```
 
-   ​
+
+## mybatis传多参数
+
+![img](pictures/properties.png)
+
+第三种方法的jabcType有点坑，每个字母大小写都必须一样，第一个“j”居然小写，，，
+
+# 大坑
+
+- SqlSesson（成员变量）没有关闭，导致ajax请求pending，原因是一个sqlsession对应了多个连接，被多次同时使用，造成阻塞。  **用什么东西记得关啊啊啊**  
