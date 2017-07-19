@@ -6,11 +6,7 @@ Tags : maven markdown
 
 ### 1、maven
 
-maven最大的好处就是不需要导入jar包，而是将jar包的gav，也即坐标写入pom.xml中
-
-
-
-​			             （gav为图中dependency中的内容）
+maven最大的好处就是不需要导入jar包，而是将jar包的gav，也即坐标写入pom.xml中，gav为dependency中的内容
 
 各类jar包等资料都存储在仓库中（默认为C:\Users\wxs\.m2，可以改动，下一讲说明），当使用到仓库没有的jar包时，maven会自动下载相关的jar包并完成编译。[中央仓库](http://mvnrepository.com/)中含有各类jar包的坐标，可以在上面查找。
 
@@ -38,7 +34,7 @@ mvn install：将jar包发到本地仓库中
 
 （如图：  <localRepository>d:/java/maven/repository</localRepository>将setting.xml放入maven文件夹中，repository文件夹作为仓库）
 
-![](C:\Users\wxs\Desktop\微信图片_20170711110702.png)
+![](http://ot0aou666.bkt.clouddn.com/%E8%AE%BE%E7%BD%AE%E6%9C%AC%E5%9C%B0%E5%B7%A5%E5%8E%82.png)
 
 2、然后将conf中的setting.xml也做同样的修改
 
@@ -374,7 +370,7 @@ site
 
 
 
-## 第七、maven项目的分模块模式（有待确定）
+## 第七、maven项目的分模块模式
 
 ### 1、依赖关系：
 
@@ -397,4 +393,48 @@ app-web     --> app-service
 多模块的Maven项目结构支持一些Maven的更有趣的特性（如DepencencyManagement），这留作以后讨论。
 
 
+
+## 第八、setting.xml内的一些设置
+
+### 1、设置镜像（阿里云镜像）：
+
+![](http://ot0aou666.bkt.clouddn.com/%E8%AE%BE%E7%BD%AE%E9%95%9C%E5%83%8F.png)
+
+如图，在eclipse认定的maven路径下的setting.xml的<mirrors></mirrors>中设置
+
+```xml
+<mirror>
+    <id>alimaven</id>
+    <name>aliyun maven</name>
+    <url>http://maven.aliyun.com/nexus/content/groups/public/</url>
+    <mirrorOf>central</mirrorOf>
+ </mirror>
+```
+
+
+
+### 2、将maven项目默认为jdk1.7
+
+![](http://ot0aou666.bkt.clouddn.com/maven%E9%A1%B9%E7%9B%AE%E9%BB%98%E8%AE%A4%E4%B8%BAjdk1.7.png)
+
+原先maven项目默认为javaSE1.5，现在需要在eclipse认定的maven路径下的setting.xml中的<profiles></profiles>中设置
+
+```xml
+<profile>
+  <id>jdk-1.7</id>
+  <activation>
+    <activeByDefault>true</activeByDefault>
+    <jdk>1.7</jdk>
+  </activation>
+  <properties>
+    <maven.compiler.source>1.7</maven.compiler.source>
+    <maven.compiler.target>1.7</maven.compiler.target>
+    <maven.compiler.compilerVersion>1.7</maven.compiler.compilerVersion>
+  </properties>
+</profile>
+```
+
+
+
+**注：设置好后记得在eclipse中windows->preferences->maven->usersetting中update setting**
 
