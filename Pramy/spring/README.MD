@@ -124,6 +124,7 @@ Spring 2.5 在 @Repository 的基础上增加了功能类似的额外三个注�
 - @Component 是一个泛化的概念，仅仅表示一个组件 (Bean) ，可以作用在任何层次。
 - @Service 通常作用在业务层，但是目前该功能与 @Component 相同。
 - @Constroller 通常作用在控制层，但是目前该功能与 @Component 相同。
+- @Repository 标识为dao
 
 通过在类上使用 @Repository、@Component、@Service 和 @Constroller 注解，Spring 会自动创建相应的 BeanDefinition 对象，并注册到 ApplicationContext 中。这些类就成了 Spring 受管组件。这三个注解除了作用于不同软件层次的类，其使用方式与 @Repository 是完全相同的
 
@@ -170,5 +171,65 @@ B 和C 需要实现A接口的方法；根据需要可以在B,C的实现方法中
  A a = (A)ctx.getBean("id");//强转接口
 a.action
  //这样子就可以通过在xml配置可以让接口A去实现B类的逻辑方法，或者C类的逻辑方法，达到降低耦合度的效果
+```
+
+# 四 生命周期socpe
+
+![2](image/2.png)
+
+实例化：当spring框架启动的时候，解析完配置文件的时候，就会把scope=singleton的bean加载到内存区。
+
+首先调用无参构造器（默认）new出一个实例。然后调用set方法设置属性。
+
+```java
+public class Boss implements BeanNameAware,BeanFactoryAware,ApplicationContextAware,InitializingBean
+```
+
+实现了beanNameAware接口急需要实现方法：给你传入bean的id
+
+BeanFactoryAware 给你传入BeanFactory
+
+ApplicationContextAware给你传入ApplicationContext
+
+[**BeanPostProcessor**]()
+
+后置处理器，类似于web 中的filter
+
+可以绑定bean，在xml中配置
+
+首先创建一个bean 实现BeanPostProcessor接口，然后破实现其中的方法
+
+```java
+public class MyBeanPostProcessor implements BeanPostProcessor {
+    @Override
+    public Object postProcessBeforeInitialization(Object o, String s) throws BeansException {
+        return o;
+    }
+
+    @Override
+    public Object postProcessAfterInitialization(Object o, String s) throws BeansException {
+        return o;
+    }
+}
+```
+
+然后再在xml中加载你这个bean
+
+```xml
+ <bean id="myBeanPostProcessor" class="com.pramy.po.MyBeanPostProcessor"/>
+```
+
+
+
+![](image/1.png)
+
+在每一次实现bean的是偶都会实现before()方法然后实现after()方法后再去调用bean
+
+[**InitializingBean**]()
+
+如果还实现了这个接口就会在`BeanPostProcessor` 的before和after方法之间实现InitializingBean中的`afterPropertiesSet()` 的方法，如果你在xml配置bean 的时候加入了`init-method`，接下来就会实现你自定义的方法
+
+```xml
+ <bean id="boss" init-method="init" class="com.pramy.po.Boss"/>
 ```
 
