@@ -320,3 +320,80 @@ public class MyBeanPostProcessor implements BeanPostProcessor {
 <context:property-placeholder location="classpath:com/hsp/dispatch/db.properties,classpath:com/hsp/dispatch/db2.properties"/>
 ```
 
+# AOP编程（aspect oriented programming）
+
+面向切面编程，核心（在不增加代码饿基础上，还增加新功能 ）
+
+![4](image/4.png)
+
+```xml
+    <!--首先要写一个bean-->
+	<bean id="a" class="com.pramy.proxy.A">
+        <property name="name" value="pramy"/>
+    </bean>
+
+    <!--配置自己的前置通知，这个前置通知类要实现MethodBeforeAdvice接口-->
+    <bean id="myMethodBefore" class="com.pramy.proxy.MyMethodBeforeAdvice"/>
+
+	<!--现在开始配置代理器-->
+    <bean id="proxy" class="org.springframework.aop.framework.ProxyFactoryBean">
+       <!--首先配置代理接口，一个类可以实现多个接口-->
+      	<property name="proxyInterfaces">
+            <list>
+              	<!--这些写接口的全类名-->
+                <value>com.pramy.proxy.HelloInterface</value>
+                <value>com.pramy.proxy.ByeInterface</value>
+            </list>
+        </property>
+      <!--自己的事务管理器，可以配置多个，但是这里的value必须是已存在的bean的id-->
+        <property name="interceptorNames">
+            <list>
+                <value>myMethodBefore</value>
+            </list>
+        </property>
+      	<!--最后配置需要代理的实例，后面引用id达到代理的过程-->
+        <property name="target" ref="a"/>
+    </bean>
+```
+
+```java
+public class A implements HelloInterface,ByeInterface {
+    private String name;
+    public String getName() {
+        return name;
+    }
+    public void setName(String name) {
+        this.name = name;
+    }
+  	//实现A接口的方法
+    @Override
+    public void sayHello() {
+        System.out.println(this.name+": hello");
+    }
+	//实现B接口的方法
+    @Override
+    public void sayBye() {
+        System.out.println(this.name+": bye");
+    }
+  
+}
+```
+
+```java
+    public static void main(String[] args) {
+        ApplicationContext ac = new ClassPathXmlApplicationContext("proxy.xml");
+      	//这里注意，拿到的bean是代理对象，通过强转接口来实现方法
+        ByeInterface a = (ByeInterface) ac.getBean("proxy");
+        a.sayBye();
+    }
+```
+
+总结：事务管理器被抽取出来成为一个切面，然而代理对象变成了目标对象和切面的连接点，连接点是一个静态的										     概念，配置代理了接口和目标对象——切面，建立物理上的连接，但是我们可以通过选择切入点去使用哪一个方法
+
+# 拦截器
+
+![5](image/5.png)
+
+如果实现了**环绕通知** 就必须要实现`invocation.proceed();` 方法，这个方法会有一个object类型的返回值，必须接住向上返回，否则在主函数中不会收到返回值
+
+![6](image/6.png)
