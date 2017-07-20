@@ -182,7 +182,7 @@ a.action
 首先调用无参构造器（默认）new出一个实例。然后调用set方法设置属性。
 
 ```java
-public class Boss implements BeanNameAware,BeanFactoryAware,ApplicationContextAware,InitializingBean
+public class Boss implements BeanNameAware,BeanFactoryAware,ApplicationContextAware,InitializingBean,DisposableBean
 ```
 
 实现了beanNameAware接口急需要实现方法：给你传入bean的id
@@ -231,5 +231,92 @@ public class MyBeanPostProcessor implements BeanPostProcessor {
 
 ```xml
  <bean id="boss" init-method="init" class="com.pramy.po.Boss"/>
+```
+
+[**DisposableBean**]()
+
+实现这这个接口在容器关闭的时候会调用destroy的方法
+
+# 五 装配Bean
+
+当一个bean中有一个不是基本数据类型的对象的时候，可以引用
+
+```xml
+<property name="" ref=""/>
+```
+
+- set：里面的东西不能相同
+
+```xml
+<property name="" >
+  <set >
+    <ref bean=""/> <!--引用-->
+  </set>
+</property>
+```
+
+- map：后面相同的会覆盖
+
+```xml
+<map>
+  <entry key="" value=""/>    <!--里面的key和value也可以应用对象-->
+</map>
+```
+
+- list
+
+同理，里面可以放很多东西，可以引用，可以指定类型
+
+- Propertries
+
+```xml
+<property name="pp">
+	<props>
+		<prop key="pp1">abcd</prop>
+		<prop key="pp2">hello</prop>
+	</props>
+</property>
+```
+
+在应用中取出来，可以转Entry来遍历，也可以转枚举来遍历
+
+### 内部bean
+
+就相当于内部类，不能再被其他bean依赖引用
+
+### 继承
+
+在bean元素中有一个parent的元素，可以写继承的父类的id，记住，如果在子类中重新给父类成员变量赋值，会覆盖父类的变量，但是原本父类中的值没变
+
+### 构造函数
+
+```xml
+    <bean id="student" parent="person" class="com.pramy.po.Student">
+        <constructor-arg index="" value="" ref="" type=""/>
+    </bean>
+```
+
+- index :参数索引
+- value：值
+- ref：引用
+- type：类型
+
+会调用相应的构造构造器去构造bean ，根据你注入的参数数量和类型去选定
+
+### 自动注入
+
+```xml
+    <bean id="student" parent="person" class="com.pramy.po.Student" autowire=""/>
+```
+
+不填就是no
+
+![3](image/3.png)
+
+### 分散配置
+
+```xml
+<!--指定位置读入配置，用$来获取值-->
+<context:property-placeholder location="classpath:com/hsp/dispatch/db.properties,classpath:com/hsp/dispatch/db2.properties"/>
 ```
 
