@@ -74,7 +74,7 @@ praent：引用父类的
 
 如果用`<value></value>`的方式给bean赋值，只会得到空字符串，不会的到null，必须用null元素标签`<value><null/></value>`
 
-## 5.4.5级联属性
+### 5.4.5级联属性
 
 ```xml
 <bean id="boss" class="com.smart.attr.Boss">
@@ -84,7 +84,7 @@ praent：引用父类的
 
 我们为boss类里面的car对象的brand元素赋值，但是前提是boss对象里面存在car实例
 
-## 5.6.1继承
+### 5.6.1继承
 
 ```xml
     <!-- 父子<bean> -->
@@ -101,7 +101,7 @@ praent：引用父类的
 
 子类继承父类的信息，并且重新给属性color赋值，父类的主要功能是简化子类的配置，所以声明**abstract=true **，这表示spring Ioc容器不会实例化这个bean
 
-## 5.6.2依赖
+### 5.6.2依赖
 
 一般情况下我们用ref来表示对其他bean的依赖，但是这bean是死的，所有属性都定死。
 
@@ -116,3 +116,27 @@ praent：引用父类的
 在实例化cacheManager之前会先实例化sysinit，你就可以在sysinit里写各种各样的操作
 
 比如A-->B  但是可以显式 指定A ：depends-on C     ，C可以在对B的属性的修改，达到A动态变化的效果
+
+### 5.6.3引用
+
+`ref`和`idref` 的区别
+
+ref是引用bean实例，idref是引用该bean的id 或者是name，相当于value元素，当时value是没有具备检验功能的，但是idref是有的，会检查该容器中是否有这个bean存在，如果没有回抛出**BeanDefinitionStoreException **
+
+### 5.7 整合多个配置文件
+
+```xml
+<import resource="classpath:com/samrt/impt/beans1.xml"/>
+<!--可以通过引入另外一个配置文件，达到拥有完全的属性-->
+```
+
+a.xml引入b.xml，spring在启动的时候就会只加载a.xml就可以了，不引入的情况就是会同时加载a.xml和b.xml然后再内容中合并
+
+### 5.8单例模式singleton
+
+在内存中只有一个实例，在spring默认的方式就是单例模式，但是这有一个点，在spring启动的时候会去实例化一个bean但是如果这个bean被实例化了但是很久都没有用到，或者是用户的业务逻辑没有使用到这个bean，就造成了浪费，所以采用懒加载的模式，在bean后面加上一个`lazy-init=true` 的元素,就是在用户使用的时候才会被实例化
+
+### 5.8.4作用域依赖问题
+
+
+
