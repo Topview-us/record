@@ -138,5 +138,109 @@ a.xml引入b.xml，spring在启动的时候就会只加载a.xml就可以了，�
 
 ### 5.8.4作用域依赖问题
 
+```xml
+<bean name="car" class="com.smart.scope.Car" scope="request">
+	<!--需要用到aop命名空间，创建代理-->	
+	<aop :scoped-proxy/>	
+</bean>
+<bean id="boss" class="com.smart.scope.Boss">
+  	<!--引用相关作用域的car Bean-->
+	<propertry name="car" ref="car"/>  
+</bean>
+```
 
+![1](image/1.png)
+
+由于boss是单实例的每一次request都应当实例相对作用域的car，所以引入aop代理的概念，代理给boss和car做了桥接，当boss Bean在Web环境下调用car Bean时，Spring AOP将启动动态代理只能判断boss位于哪一个HTTP请求中，并且让boos引用到相应的HTTP请求的car Bean中
+
+但是启动代理之后直接被boss引用的不是car Bean 而是AOP代理
+
+### 5.10.2扫描注解定义的bean
+
+ @Value("#{beanName.propName}")
+
+# 第七章 AOP
+
+### 7.12AOP术语：
+
+![2](image/2.png)
+
+![3](image/3.png)
+
+![4](image/4.png)
+
+![5](image/5.png)
+
+![6](image/6.png)
+
+![7](image/7.png)
+
+![8](image/8.png)
+
+![9](image/9.png)
+
+### 7.2.1
+
+JDK的动态代理，CGLib的动态代理
+
+区别在于JDK只支持接口代理，不支持类的代理
+
+**JDK代理 **
+
+```java
+public class PerformaceHandler implements InvocationHandler {
+    private Object target;
+	public PerformaceHandler(Object target){
+		this.target = target;
+	}
+	public Object invoke(Object proxy, Method method, Object[] args)
+			throws Throwable {
+		PerformanceMonitor.begin(target.getClass().getName()+"."+ method.getName());
+		Object obj = method.invoke(target, args);
+		PerformanceMonitor.end();
+		return obj;
+	}
+}
+```
+
+使用：
+
+```java
+		ForumService target = new ForumServiceImpl();
+		PerformaceHandler handler = new PerformaceHandler(target);
+		ForumService proxy = (ForumService) Proxy.newProxyInstance(target
+				.getClass().getClassLoader(),
+				target.getClass().getInterfaces(), handler);
+```
+
+CglibProxy代理
+
+```java
+public class CglibProxy implements MethodInterceptor {
+	private Enhancer enhancer = new Enhancer();
+
+	public Object getProxy(Class clazz) {
+		enhancer.setSuperclass(clazz);
+		enhancer.setCallback(this);
+		return enhancer.create();
+	}
+
+	public Object intercept(Object obj, Method method, Object[] args,
+			MethodProxy proxy) throws Throwable {
+		PerformanceMonitor.begin(obj.getClass().getName()+"."+method.getName());
+		Object result=proxy.invokeSuper(obj, args);
+		PerformanceMonitor.end();
+		return result;
+	}
+}
+```
+
+使用
+
+```java
+CglibProxy cglibProxy = new CglibProxy();
+		ForumService forumService = (ForumService)cglibProxy.getProxy(ForumServiceImpl.class);
+```
+
+CGLib是采用拦截父类方法，通过创建子类的方式生成代理对象，所以不能对目标类中final或者private方法进行代理
 
