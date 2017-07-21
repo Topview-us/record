@@ -15,3 +15,104 @@
 ExtClassLoader和AppClassLoader都是ClassLoader的子类，AppClassLoader负责加载ClassPath路径下的jar包，而ExtClassLoader负责加载jre目录下的ext中jar包，根加载器在jvm中属于底层，在程序中不可见，但是三个加载器之间有着明显的父子层级。
 
 ExtClassLoader是AppClassLoader的父装载器，一般默认用AppClassLoader加载类，jvm加载使用“全盘责任委托机制”：先委托父加载器去寻找目标类，在找不到的时候自己才会从自己的方式中加载
+
+## 第五章
+
+### 5.3.3工厂注入
+
+```java
+public class CarFactory {
+   public Car createHongQiCar(){
+	   Car car = new Car();
+	   car.setBrand("红旗CA72");
+	   return car;
+   }
+   
+   public static Car createCar(){
+	   Car car = new Car();
+	   return car;
+   }
+}
+
+```
+
+- 通过工厂类注入
+
+  ```xml
+  	<!--首先定义工厂类-->
+  	<bean id="carFactory" class="com.smart.ditype.CarFactory" />
+  	<!--然后配置Bean，说明使用工厂carFactory的createHongQiCar来创建-->
+  	<bean id="car5" factory-bean="carFactory" factory-method="createHongQiCar"/>
+  ```
+
+- 通过静态工厂注入
+
+  ```xml
+  <!--指定工厂类，然后调用它的静态构造方法-->
+  <bean id="car6" class="com.smart.ditype.CarFactory" factory-method="createCar"/>
+  ```
+
+### 5.4.1字面值
+
+XML特殊标签<![CDATA[ ]]>，这标签的作用就是让XML解析器将标签中的字符串当做普通的文本对待，防止对特殊字符对XML解析造成影响
+
+一般XML会忽略元素标签内部字符串的前后空格，但是spring不会
+
+### 5.4.2引用其他Bean
+
+```xml
+<ref bean=""/>或者<ref local=""/>或者<ref praent=""/>
+```
+
+bean：可以用引用同一容器或者父类容器的bean
+
+local：引用本地
+
+praent：引用父类的
+
+### 5.4.4null
+
+如果用`<value></value>`的方式给bean赋值，只会得到空字符串，不会的到null，必须用null元素标签`<value><null/></value>`
+
+## 5.4.5级联属性
+
+```xml
+<bean id="boss" class="com.smart.attr.Boss">
+	<property name="car.brand" value="111"/>
+</bean>
+```
+
+我们为boss类里面的car对象的brand元素赋值，但是前提是boss对象里面存在car实例
+
+## 5.6.1继承
+
+```xml
+    <!-- 父子<bean> -->
+	<bean id="abstractCar" class="com.smart.tagdepend.Car"
+	      p:brand="红旗CA72" p:price="2000.00" p:color="黑色"
+	      abstract="true"/>
+	<bean id="car3" parent="abstractCar">
+		<property name="color" value="红色"/>
+	</bean>
+	<bean id="car4" parent="abstractCar" >
+		<property name="color" value="白色"/>
+	</bean>	
+```
+
+子类继承父类的信息，并且重新给属性color赋值，父类的主要功能是简化子类的配置，所以声明**abstract=true **，这表示spring Ioc容器不会实例化这个bean
+
+## 5.6.2依赖
+
+一般情况下我们用ref来表示对其他bean的依赖，但是这bean是死的，所有属性都定死。
+
+这时候就可以用依赖关系来实现，用**depends-on ** 显示来指定依赖关系
+
+```xml
+<!-- <bean>的信赖 -->
+	<bean id="cacheManager" class="com.smart.tagdepend.CacheManager" depends-on="sysInit" />
+	<bean id="sysInit" class="com.smart.tagdepend.SysInit" />
+```
+
+在实例化cacheManager之前会先实例化sysinit，你就可以在sysinit里写各种各样的操作
+
+比如A-->B  但是可以显式 指定A ：depends-on C     ，C可以在对B的属性的修改，达到A动态变化的效果

@@ -175,21 +175,9 @@ a.action
 
 # 四 生命周期socpe
 
-![2](image/2.png)
+![2](image/2.png)![7](image/7.png)
 
-实例化：当spring框架启动的时候，解析完配置文件的时候，就会把scope=singleton的bean加载到内存区。
-
-首先调用无参构造器（默认）new出一个实例。然后调用set方法设置属性。
-
-```java
-public class Boss implements BeanNameAware,BeanFactoryAware,ApplicationContextAware,InitializingBean,DisposableBean
-```
-
-实现了beanNameAware接口急需要实现方法：给你传入bean的id
-
-BeanFactoryAware 给你传入BeanFactory
-
-ApplicationContextAware给你传入ApplicationContext
+**ApplicationContext和BeanFactory不同之处就是，前者可以通过Java反射机制自动识别出配置文件中定义的各种处理器，并且将他们注册到应用上下文中，而后者需要手动调addBeanPostProcessor() **
 
 [**BeanPostProcessor**]()
 
@@ -225,6 +213,45 @@ public class MyBeanPostProcessor implements BeanPostProcessor {
 
 在每一次实现bean的是偶都会实现before()方法然后实现after()方法后再去调用bean
 
+[**InstantiationAwareBeanPostProcessor**]()
+
+这是一个接口,但是继承了**BeanPostProcessor **接口，调用getBean的时候，如果容器实现了这个接口，则在该bean之前，调用以下这个方法
+```java
+public Object postProcessBeforeInstantiation(Class beanClass, String beanName)
+```
+
+实例化：当spring框架启动的时候，解析完配置文件的时候，就会把scope=singleton的bean加载到内存区。
+
+首先调用无参构造器（默认）new出一个实例。
+
+如果实现了这个接口，则在该对象实例化后实现以下这个方法
+
+```java
+public boolean postProcessAfterInstantiation(Object bean, String beanName)
+```
+
+然后再设置属性前会执行
+
+```java
+public PropertyValues postProcessPropertyValues(PropertyValues pvs, PropertyDescriptor[] pds, Object bean, String beanName)
+```
+
+然后调用set方法设置属性。
+
+```java
+public class Boss implements BeanNameAware,BeanFactoryAware,ApplicationContextAware,InitializingBean,DisposableBean
+```
+
+**其他后置处理器需要bean继承或者实现，但是BeanPostProcessor不需要bean继承，可以单独写一个类实现，然后把这个类注册到spring容器中既可以 **
+
+实现了beanNameAware接口要实现方法：给你传入bean的id
+
+BeanFactoryAware 给你传入BeanFactory
+
+ApplicationContextAware给你传入ApplicationContext
+
+
+
 [**InitializingBean**]()
 
 如果还实现了这个接口就会在`BeanPostProcessor` 的before和after方法之间实现InitializingBean中的`afterPropertiesSet()` 的方法，如果你在xml配置bean 的时候加入了`init-method`，接下来就会实现你自定义的方法
@@ -235,7 +262,7 @@ public class MyBeanPostProcessor implements BeanPostProcessor {
 
 [**DisposableBean**]()
 
-实现这这个接口在容器关闭的时候会调用destroy的方法
+对于scope=singleton的Bean实现这这个接口在容器关闭的时候会调用destroy的方法
 
 # 五 装配Bean
 
