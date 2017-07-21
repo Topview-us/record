@@ -1,0 +1,73 @@
+public class MapperAnnotationBuilder {
+
+  private final Set<Class<? extends Annotation>> sqlAnnotationTypes = new HashSet<Class<? extends Annotation>>();
+  private final Set<Class<? extends Annotation>> sqlProviderAnnotationTypes = new HashSet<Class<? extends Annotation>>();
+
+  private Configuration configuration;
+  private MapperBuilderAssistant assistant;
+  private Class<?> type;
+
+  public MapperAnnotationBuilder(Configuration configuration, Class<?> type) {
+    String resource = type.getName().replace('.', '/') + ".java (best guess)";
+    this.assistant = new MapperBuilderAssistant(configuration, resource);
+    this.configuration = configuration;
+    this.type = type;
+
+    sqlAnnotationTypes.add(Select.class);
+    sqlAnnotationTypes.add(Insert.class);
+    sqlAnnotationTypes.add(Update.class);
+    sqlAnnotationTypes.add(Delete.class);
+
+    sqlProviderAnnotationTypes.add(SelectProvider.class);
+    sqlProviderAnnotationTypes.add(InsertProvider.class);
+    sqlProviderAnnotationTypes.add(UpdateProvider.class);
+    sqlProviderAnnotationTypes.add(DeleteProvider.class);
+  }
+
+  public void parse() {
+    String resource = type.toString();
+    if (!configuration.isResourceLoaded(resource)) {
+      loadXmlResource();
+      configuration.addLoadedResource(resource);
+      assistant.setCurrentNamespace(type.getName());
+      parseCache();
+      parseCacheRef();
+      Method[] methods = type.getMethods();
+      for (Method method : methods) {
+        try {
+          // issue #237
+          if (!method.isBridge()) {
+            parseStatement(method);
+          }
+        } catch (IncompleteElementException e) {
+          configuration.addIncompleteMethod(new MethodResolver(this, method));
+        }
+      }
+    }
+    parsePendingMethods();
+  }
+
+  private void parsePendingMethods() {
+    Collection<MethodResolver> incompleteMethods = configuration.getIncompleteMethods();
+    synchronized (incompleteMethods) {
+      Iterator<MethodResolver> iter = incompleteMethods.iterator();
+      while (iter.hasNext()) {
+        try {
+          iter.next().resolve();
+          iter.remove();
+        } catch (IncompleteElementException e) {
+          // This method is still missing a resource
+        }
+      }
+    }
+  }
+
+  private void loadXmlResource() {
+    // Spring may not know the real resource name so we check a flag
+    // to prevent loading again a resource twice
+    // this flag is set at XMLMapperBuilder#bindMapperForNamespace
+    if (!configuration.isResourceLoaded("namespace:" + type.getName())) {
+      String xmlResource = type.getName().replace('.', '/') + ".xml";
+      InputStream inputStream = null;
+      try {
+        inputStream = Resources.getResourceAsStream(type.getClassLoader(), xmlResource);
