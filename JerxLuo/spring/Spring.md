@@ -253,100 +253,108 @@ ApplicationContext  = new XmlWebApplicationContext();
   ##### 配置bean的属性值
 
   ```xml
-  <bean id="department" class="com.topview.collection.Department">
-          	<property name="name">
-          		<value>财务部</value>	
-          	</property>
-          	<property name="empName">
-  <!--Set型-->
-          		<list>
-          			<ref bean="empl1"/>
-          			<ref bean="empl1"/>
-          		</list>
-          	</property>
-          	<property name="empl">
-  <!--List型-->
-          		<list>
-          			<ref bean="empl1"/>
-          			<ref bean="empl1"/>
-          			<ref bean="empl2"/>
-          		</list>
-          	</property>
-  <!--Map型-->
-          	<property name="emplMap">
-          		<map>
-          		<entry key="1"  value-ref="empl1"></entry>
-          		<entry key="2" value-ref="empl2"></entry>
-          		<entry key="2" value-ref="empl1"></entry>
-          			
-          		</map>
-          	</property>
-          </bean>
-         	<bean id="empl1" class="com.topview.collection.Employee" >
-         		<property name="name" value="北京"></property>
-         	</bean >
-         	<bean id="empl2" class="com.topview.collection.Employee"> 
-         		<property name="name" value="汕头"></property>
-         	</bean>
+<bean id="department" class="com.topview.collection.Department">
+  <property name="name">
+    <value>财务部</value>	
+  </property>
+  <property name="empName">
+    <!--Set型：对象不能一样，若该bean的scope是prototype就可以直接配入同一个配置的bean-->
+    <list>
+      <ref bean="empl2"/>
+      <ref bean="empl1"/>
+    </list>
+  </property>
+  <property name="empl">
+    <!--List型：对象可以一样-->
+    <list>
+      <ref bean="empl1"/>
+      <ref bean="empl1"/>
+      <ref bean="empl2"/>
+    </list>
+  </property>
+  <!--Map型:key是唯一标识符，不能一样-->
+  <property name="emplMap">
+    <map>
+      <entry key="1"  value-ref="empl1"></entry>
+      <entry key="2" value-ref="empl2"></entry>
+      <entry key="2" value-ref="empl1"></entry>
+
+    </map>
+  </property>
+</bean>
+<bean id="empl1" class="com.topview.collection.Employee" >
+  <property name="name" value="北京"></property>
+</bean >
+<bean id="empl2" class="com.topview.collection.Employee"> 
+  <property name="name" value="汕头"></property>
+</bean>、
+<bean>
+  <property name="pp">
+    <props>
+      <prop key="pp1">abcd</prop>
+      <prop key="pp2">hello</prop>
+    </props>
+  </property>
+</bean>
   ```
 
   ##### 获取bean的属性值
 
   ```java
-  //List-----------------------------------------------------------
-  for( Employee empName : dp.getEmpName())
-  {
-    System.out.println(empName);
-  }
-  //Set-------------------------------------------------------------
-  for(Employee e : dp.getEmpl())
-  {
-    System.out.println(e);
-    System.out.println(e.getName());
-  }
-  //Map--------------------------------------------------------------
-  //1.迭代器
-  System.out.println("Map");
-  Map<String,Employee> empMap = dp.getEmplMap();
-  Iterator	it = dp.getEmplMap().keySet().iterator();
-  while(it.hasNext()){
-    String key  = (String) it.next();
-    Employee emp = empMap.get(key);
-    System.out.println(emp);
-  }
-  //2.entry简洁方法
-  	/*	for(Entry<String, Employee> entry: dp.getEmplMap())
+//List-----------------------------------------------------------
+for( Employee empName : dp.getEmpName())
+{
+  System.out.println(empName);
+}
+//Set-------------------------------------------------------------
+for(Employee e : dp.getEmpl())
+{
+  System.out.println(e);
+  System.out.println(e.getName());
+}
+//Map--------------------------------------------------------------
+//1.迭代器
+System.out.println("Map");
+Map<String,Employee> empMap = dp.getEmplMap();
+Iterator	it = dp.getEmplMap().keySet().iterator();
+while(it.hasNext()){
+  String key  = (String) it.next();
+  Employee emp = empMap.get(key);
+  System.out.println(emp);
+}
+//2.entry简洁方法
+/*	for(Entry<String, Employee> entry: dp.getEmplMap())
   		{
   			System.out.println("key" + entry.getKey() + "value" + entry.getValue());
   		}*/
-	//Properties-----------------------------------------------------
-	for(Entry<Object, Object> entry: pp.entrySet())
-    {
-      System.out.println("Entry" + entry.getKey().toString() + " " 				+entry.getValue().toString());
-    }
+//Properties-----------------------------------------------------
+for(Entry<Object, Object> entry: pp.entrySet())
+{
+  System.out.println("Entry" + entry.getKey().toString() + " " 				+entry.getValue().toString());
+}
 
-    System.out.println("Enumeration得到属性集合的值");
-    Enumeration en = pp.keys();
-    while(en.hasMoreElements()){
-     /*Entry<Object,Object> entry = (Entry<Object, Object>) 		   en.nextElement();
+  System.out.println("Enumeration得到属性集合的值");
+  Enumeration en = pp.keys();
+  while(en.hasMoreElements()){
+  /*Entry<Object,Object> entry = (Entry<Object, Object>) 		   en.nextElement();
      System.out.println(entry.getKey() + " " + entry.getValue() );*/
-     String key = (String) en.nextElement();
-     System.out.println(key + pp.getProperty(key));
-    }
+    String key = (String) en.nextElement();
+    System.out.println(key + pp.getProperty(key));
+}
   ```
 
 ### 2.1.2.内部bean
 
   ```xml
-  <bean id="department" class="com.topview.collection.Department">
-          	<property name="name">
-          		<value>财务部</value>	
-          	</property>
-          	<property name="empName">
-                <!--内部bean-->
-                <bean class="...Bar"></bean>
-               </property>
-    </bean?
+<bean id="department" class="com.topview.collection.Department">
+  <property name="name">
+    <value>财务部</value>	
+  </property>
+  <property name="empName">
+    <!--内部bean-->
+    <bean class="...Bar"></bean>
+  </property>
+</bean>
   ```
 
   缺点：复用性不高
@@ -360,16 +368,16 @@ ApplicationContext  = new XmlWebApplicationContext();
   子类可以重复给属性赋值以**覆盖**父类的给属性赋的值
 
   ```xml
-  <bean id="student" class="...Student">
-  	<property name="name">
-        <value>学生</value>
-    </property>
-  </bean>
-  <bean id="graduate" class="....Graduate" parent="student">
+<bean id="student" class="...Student">
   <property name="name">
-        <value>毕业生</value>
-    </property>
-  </bean>
+    <value>学生</value>
+  </property>
+</bean>
+<bean id="graduate" class="....Graduate" parent="student">
+  <property name="name">
+    <value>毕业生</value>
+  </property>
+</bean>
   ```
 
 ## 2.3.自动装配（不推荐使用）
@@ -436,11 +444,11 @@ barBean的类型是fooBean的属性的类型，自动匹配,若是barBean类型�
 3. 使用db.properties文件中的属性值
 
    ```xml
-    <bean id="dbUtil" class="com.topview.util.DbUtil">
-           	<property name="name" value="${db.name}"></property>
-           	<property name="drivername" value="${db.drivername}"></property>
-           	<property name="url" value="${db.url}"></property>
-           	<property name="pwd" value="${db.pwd}"></property>
+   <bean id="dbUtil" class="com.topview.util.DbUtil">
+     <property name="name" value="${db.name}"></property>
+     <property name="drivername" value="${db.drivername}"></property>
+     <property name="url" value="${db.url}"></property>
+     <property name="pwd" value="${db.pwd}"></property>
    </bean>
    ```
 
@@ -508,13 +516,13 @@ aspect oriented programing(面向切面编程)，是对所有对象或者是一�
   ```java
   public class MyMethodInterceptor implements MethodInterceptor {
 
-  	@Override
-  	public Object invoke(MethodInvocation invocation) throws Throwable {
-  		System.out.println("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~环绕通知");
-  		invocation.proceed();
-  		System.out.println("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~环绕通知");
-  		return null;
-  	}
+    @Override
+    public Object invoke(MethodInvocation invocation) throws Throwable {
+      System.out.println("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~环绕通知");
+      invocation.proceed();
+      System.out.println("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~环绕通知");
+      return null;
+    }
   }
   ```
 
@@ -525,17 +533,17 @@ aspect oriented programing(面向切面编程)，是对所有对象或者是一�
   ```java
   public class MyAfterReturningAdvice implements AfterReturningAdvice {
 
-  	@Override
-  	public void afterReturning(Object returnValue, Method method, Object[] args, Object target) throws Throwable {
-  		//returnValue: 目标对象的指定方法执行完毕的返回值
-  		//method的各种信息
-  		//target是指目标对象
-  		System.out.println("------------------------------后置通知");
-  		System.out.println("returnValue" + returnValue);
-  		System.out.println("method " + method);
-  		System.out.println("target " + target);
-  		System.out.println("------------------------------后置通知");
-  	}
+    @Override
+    public void afterReturning(Object returnValue, Method method, Object[] args, Object target) throws Throwable {
+      //returnValue: 目标对象的指定方法执行完毕的返回值
+      //method的各种信息
+      //target是指目标对象
+      System.out.println("------------------------------后置通知");
+      System.out.println("returnValue" + returnValue);
+      System.out.println("method " + method);
+      System.out.println("target " + target);
+      System.out.println("------------------------------后置通知");
+    }
   }
   ```
 
@@ -632,33 +640,33 @@ aspect oriented programing(面向切面编程)，是对所有对象或者是一�
 - 代理对象:ProxyFactoryBean
 
 ```xml
- <!-- 1.配置被代理的对象 -->
-        <bean id="test1Service" class="com.topview.aop.Test1Service">
-        	<property name="name" value="luojiayan"></property>
-        </bean>
-        <!-- 2.配置前置通知 -->
-      <bean id="MyMethodBeforeAdvice" class="com.topview.aop.MyMethodBeforeAdvice"/>
-       
-       <!-- 3.配置代理对象 -->
-       <bean id="proxyFactoryBean" class="org.springframework.aop.framework.ProxyFactoryBean">
-       			<!-- 3.1.代理接口 集 --> 
-			   <property name="proxyInterfaces">
-			   		<list>
-			   			<value>com.topview.aop.TestServiceInter</value>
-			   			<value>com.topview.aop.TestServiceInter2</value>
-			   		</list>
-			   </property>    
-			   <!-- *重要* 3.2.将通知织入代理对象 -->
-         		<!--细节1.通知的name标签为interceptorNames-->
-			   <property name="interceptorNames" >
-			   <!-- 细节2.通知只要写id -->
-			   	<value>MyMethodBeforeAdvice</value>
-			   </property>
-			   <!-- 3.3.配置被代理对象 -->
-				<!--细节3.被代理对象写ref指向指定id-->
-			   <property name="target" ref="test1Service">
-			   </property>
-       </bean> 
+<!-- 1.配置被代理的对象 -->
+<bean id="test1Service" class="com.topview.aop.Test1Service">
+  <property name="name" value="luojiayan"></property>
+</bean>
+<!-- 2.配置前置通知 -->
+<bean id="MyMethodBeforeAdvice" class="com.topview.aop.MyMethodBeforeAdvice"/>
+
+<!-- 3.配置代理对象 -->
+<bean id="proxyFactoryBean" class="org.springframework.aop.framework.ProxyFactoryBean">
+  <!-- 3.1.代理接口 集 --> 
+  <property name="proxyInterfaces">
+    <list>
+      <value>com.topview.aop.TestServiceInter</value>
+      <value>com.topview.aop.TestServiceInter2</value>
+    </list>
+  </property>    
+  <!-- *重要* 3.2.将通知织入代理对象 -->
+  <!--细节1.通知的name标签为interceptorNames-->
+  <property name="interceptorNames" >
+    <!-- 细节2.通知只要写id -->
+    <value>MyMethodBeforeAdvice</value>
+  </property>
+  <!-- 3.3.配置被代理对象 -->
+  <!--细节3.被代理对象写ref指向指定id-->
+  <property name="target" ref="test1Service">
+  </property>
+</bean> 
 ```
 
 ### 2.4.术语剖析
