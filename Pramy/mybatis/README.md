@@ -488,7 +488,6 @@ public class MapperRegistry {
   }
   
 }
-
   ```
 
 
@@ -515,7 +514,7 @@ public <T> void addMapper(Class<T> type) {
       try {
         //创建工厂
         knownMappers.put(type, new MapperProxyFactory<T>(type));
-		//根据接口名寻找同包下同名的xml或者mapper的namespace是该接口的xml
+		//这里parser的解析
         //找到对用的xml后进行解析mapper节点里面的节点
         MapperAnnotationBuilder parser = new MapperAnnotationBuilder(config, type);
         parser.parse();
@@ -572,15 +571,152 @@ this.knownMappers.put(type, new MapperProxyFactory(type));
 
 然而方法3中带了一个参数object.class 调用2，得到的结果就是该包下的所有类都可以添加，因为所有的类都是object的子类，所以在方法2中针对每一个类继续调用方法1。确认是接口类并且没有重发之后就会添加到注册器中；一开始给定一个标志**loadCompleted**一开始没有加载完成所以默认为false，如果添加完成后就把它置为true；如果失败了，就会在finally里面从**knownMappers**中删除
 
+### MapperAnnotationBuilder
+
+我们可以看到每一次添加注册器的时候都会添加先new一个MapperAnnotationBuilder解析
+
+```java
+public void parse() {
+  //先拿到接口的全路径
+  String resource = type.toString();
+  //判断一下是否已经被加载过了，因为每一次加载完成后都会添加到configure对象的set中
+  if (!configuration.isResourceLoaded(resource)) {
+    //重点是这里，这里开始装载接口对应的xml，方法在下面
+    loadXmlResource();
+    //解析完成后如果找得到namespace就是xml的namespace，如果找不到，就是null，然后把路径添加到set里面
+    configuration.addLoadedResource(resource);
+    //然后把把全接口名设置为namespace，
+    assistant.setCurrentNamespace(type.getName());
+    parseCache();
+    parseCacheRef();
+    Method[] methods = type.getMethods();
+    for (Method method : methods) {
+      try {
+        // issue #237
+        if (!method.isBridge()) {
+          parseStatement(method);
+        }
+      } catch (IncompleteElementException e) {
+        configuration.addIncompleteMethod(new MethodResolver(this, method));
+      }
+    }
+  }
+  parsePendingMethods();
+}
+
+  private void loadXmlResource() {
+    // Spring may not know the real resource name so we check a flag
+    // to prevent loading again a resource twice
+    // this flag is set at XMLMapperBuilder#bindMapperForNamespace
+    // 这里判断configure对象的set里面是否有namespace
+    if (!configuration.isResourceLoaded("namespace:" + type.getName())) {
+      //这里是重点看下面
+      String xmlResource = type.getName().replace('.', '/') + ".xml";
+      InputStream inputStream = null;
+      try {
+        inputStream = Resources.getResourceAsStream(type.getClassLoader(), xmlResource);
+      } catch (IOException e) {
+        // ignore, resource is not required
+      }
+      if (inputStream != null) {
+        //这里开始对xml解析，
+        XMLMapperBuilder xmlParser = new XMLMapperBuilder(inputStream, assistant.getConfiguration(), xmlResource, configuration.getSqlFragments(), type.getName());
+        xmlParser.parse();
+        //这个type.getName就是接口全名
+      }
+    }
+  }
 
 
-## 回顾一下mybatisConfig.xml中的Mapper中的几个标签：
+```
 
-- resource 和url 都是指定beanMapper.xml，那我如何去获取type？其实就是从beanMapper.xml中的namespace去获得一个简单的class（过程尚未明确，有时间再去了解）
-- 而class 就是指定type，所以就会调用第方法2去添加
-- package就是调用方法3
+### 保存Mapper.xml信息的重要对象MapperBuilderAssistant
 
-  SqlSessionFactoryBean实际上对应的是SqlSessionFactory类，它会扫描sql xml文件，并对接口创建动态代理，将接口类的Class和动态代理关系保存在SqlSessionFactory中，这仅仅是完成了动态代理的生成，而动态代理在哪里被使用到，怎么使用，这些都是由MapperScannerConfigurer完成，接下来看看MapperScannerConfigurer都做了些什么？
+他是它里面设置命名空间的一个set方法
+
+```java
+ public void setCurrentNamespace(String currentNamespace) {
+    if (currentNamespace == null) {
+      throw new BuilderException("The mapper element requires a namespace attribute to be specified.");
+    }
+
+    if (this.currentNamespace != null && !this.currentNamespace.equals(currentNamespace)) {
+      throw new BuilderException("Wrong namespace. Expected '"
+          + this.currentNamespace + "' but found '" + currentNamespace + "'.");
+    }
+
+    this.currentNamespace = currentNamespace;
+  }
+```
+
+XMLMapperBuilder类里面有个MapperBuilderAssistant对象，XMLMapperBuilder的构造方法里面会把MapperBuilderAssistant初始化，并且用接口的全名作为参数（currentNamespace）调用MapperBuilderAssistant的**setCurrentNamespace** 方法
+
+```java
+  public XMLMapperBuilder(InputStream inputStream, Configuration configuration, String resource, Map<String, XNode> sqlFragments, String namespace) {
+    this(inputStream, configuration, resource, sqlFragments);
+    this.builderAssistant.setCurrentNamespace(namespace);//设置namespace
+  }
+```
+
+
+
+然后设置了currentNamespace；当XMLMapperBuilder开始解析xml文件的时候，会获取到namespace的值，然后继续调用setCurrentNamespace方法，这时候如果namespace的值不是接口的全名，然后就会抛异常
+
+```java
+private void configurationElement(XNode context) {
+  try {
+    String namespace = context.getStringAttribute("namespace");
+    if (namespace == null || namespace.equals("")) {
+      throw new BuilderException("Mapper's namespace cannot be empty");
+    }
+    builderAssistant.setCurrentNamespace(namespace);
+    cacheRefElement(context.evalNode("cache-ref"));
+    cacheElement(context.evalNode("cache"));
+    parameterMapElement(context.evalNodes("/mapper/parameterMap"));
+    resultMapElements(context.evalNodes("/mapper/resultMap"));
+    sqlElement(context.evalNodes("/mapper/sql"));
+    buildStatementFromContext(context.evalNodes("select|insert|update|delete"));
+  } catch (Exception e) {
+    throw new BuilderException("Error parsing Mapper XML. Cause: " + e, e);
+  }
+}
+```
+
+
+
+
+
+如果是以resource和url注册的话他是采先用**XMLMapperBuilder ** 解析而不是用 **MapperAnnotationBuilder ** ，并且构造XMLMapperBuilder 的时候并没有传类型进来，调用一下这个方法
+
+```java
+  public XMLMapperBuilder(InputStream inputStream, Configuration configuration, String resource, Map<String, XNode> sqlFragments) {
+    this(new XPathParser(inputStream, true, configuration.getVariables(), new XMLMapperEntityResolver()),
+        configuration, resource, sqlFragments);
+  }
+```
+
+这个方法没有设置namespace，所以在后面解析xml的时候namespace是null
+
+XMLMapperBuilder里面有一个**bindMapperForNamespace ** 方法，里面的顺序
+
+```java
+          configuration.addLoadedResource("namespace:" + namespace);
+          configuration.addMapper(boundType);
+```
+
+先把namespace插入configure的set集合里面，然后再addMapper，虽然addMapper里面还重复使用`MapperAnnotationBuilder` 去解析，但是`loadXmlResource()` 会判断configure的set集合里面有没有namespace，由于之前已经add进去了，所以`loadXmlResource()` 方法就不会执行了，但是package和class是直接用`MapperAnnotationBuilder`所以没有用到 所以没有用到`bindMapperForNamespace` 方法，所以configure对象中的set的集合是没有namespace的，所以执行该方法，我们来看一下怎么去找到xml文件的，就是下面这一句
+
+```java
+ String xmlResource = type.getName().replace('.', '/') + ".xml";
+```
+
+### 由此可得，package和url是以 直接寻找当前目录下而且是名字一样的xml
+
+### 所以xml和接口的路径和名字都不一样的话，就没办法找到xml，值得注意的是XMLMapperBuilder解析的时候会调用bindMapperForNamespace方法。但是由于接口已经注册所以不会再执行一次绑定操作
+
+
+
+SqlSessionFactoryBean实际上对应的是SqlSessionFactory类，它会扫描sql xml文件，并对接口创建动态代理，将接口类的Class和动态代理关系保存在SqlSessionFactory中，这仅仅是完成了动态代理的生成，而动态代理在哪里被使用到，怎么使用，这些都是由MapperScannerConfigurer完成，接下来看看MapperScannerConfigurer都做了些什么？
 
 ### 在MapperRegistry映射器注册器中有一个getMapper()方法
 
