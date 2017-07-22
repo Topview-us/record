@@ -244,3 +244,67 @@ CglibProxy cglibProxy = new CglibProxy();
 
 CGLib是采用拦截父类方法，通过创建子类的方式生成代理对象，所以不能对目标类中final或者private方法进行代理
 
+### 7.3.2前置增强
+
+[**MethodBeforeAdvice**]()
+
+ProxyFactory：里面承载了GCLib的代理方法和JDK动态代理的方法
+
+```java
+        Waiter target = new NaiveWaiter();
+        BeforeAdvice  advice = new GreetingBeforeAdvice();
+        ProxyFactory pf = new ProxyFactory();
+//      pf.setInterfaces(target.getClass().getInterfaces());
+        pf.setTargetClass(target.getClass());
+        pf.setOptimize(true);
+        pf.setTarget(target);
+        pf.addAdvice(advice);
+
+        Waiter proxy = (Waiter)pf.getProxy(); 
+```
+
+如果使用setInterfaces()的方法就使用JDK的动态代理
+
+如果使用的setTargetClass()的方法就是使用GCLib动态代理
+
+GCLib代理xml配置
+
+```xml
+<bean id="waiter" class="org.springframework.aop.framework.ProxyFactoryBean"
+         p:target-ref="target" 					//代理目标
+         p:interceptorNames="greetingAround"	//这里配置增强器，多个用逗号隔开
+         p:proxyTargetClass="true" 				//这里实现Class代理，使用CGLib代理
+         p:optimize="true"						//优化
+   />
+```
+
+JDK代理的配置
+
+```xml
+<bean id="waiter" class="org.springframework.aop.framework.ProxyFactoryBean"
+         p:target-ref="target"
+         p:interceptorNames="greetingAround"
+         p:interfaces="com.smart.advice.Waiter"
+   />		
+```
+
+optimize：当设置为true是，强制使用CGlib代理，对于其他作用域的代理最好用JDK代理，因为是GCLib创建时速度慢，但是创建出来的代理对象运行效率高，因为之创建子类对象，调用子类方法，而Jdk每一次都需要调用反射机制
+
+# 第十一章
+
+## 11.2.1  ThreadLocal
+
+**ThreadLoacal** 它是一个保存线程本地化对象的容器。当运行于多线程环境的谋个对象使用ThreadLocal维护变量是，ThreadLocal为每一个使用该变量的线程分配一个独立的变量副本，每一个线程都可以独立得该店自己的副本，而不会影响其他线程对副本。因为每一个线程创建的时候自己都会有一个副本。而线程和线程之间的副本都是相对其他线程的副本独立存在的。
+
+**InheritableThreadLocal** 继承于ThreadLocal，他自动为子线程赋值一份从父线程那里继承而来的本定变量：在创建子线程时，子线程会接收所有可继承的线程本定变量的初始值
+
+### ThreadLocal
+
+get，set ，remove，initialValue
+
+initialValue：返回该线程局部变量的初始值，可以重写，在线程第一次使用get或者set时才执行，只执行一次
+
+## 11.3.2 Spring的事物管理器实现类
+
+![10](image/10.png)
+
