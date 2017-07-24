@@ -349,7 +349,7 @@ ApplicationContextAware给你传入ApplicationContext
 
 # AOP编程（aspect oriented programming）
 
-面向切面编程，核心（在不增加代码饿基础上，还增加新功能 ）
+面向切面编程，核心（在不增加代码饿基础上，还增加新功能 ）,提供声明式服务（声明式事物），允许用户实现自定义切面
 
 ![4](image/4.png)
 
