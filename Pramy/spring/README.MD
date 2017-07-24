@@ -1,3 +1,5 @@
+
+
 # 一.spring配置文件
 
 ```xml
@@ -347,9 +349,9 @@ ApplicationContextAware给你传入ApplicationContext
 <context:property-placeholder location="classpath:com/hsp/dispatch/db.properties,classpath:com/hsp/dispatch/db2.properties"/>
 ```
 
-# AOP编程（aspect oriented programming）
+# 六 AOP编程
 
-面向切面编程，核心（在不增加代码饿基础上，还增加新功能 ）,提供声明式服务（声明式事物），允许用户实现自定义切面
+面向切面编程（aspect oriented programming），核心（在不增加代码饿基础上，还增加新功能 ）,提供声明式服务（声明式事物），允许用户实现自定义切面
 
 ![4](image/4.png)
 
@@ -417,10 +419,103 @@ public class A implements HelloInterface,ByeInterface {
 
 总结：事务管理器被抽取出来成为一个切面，然而代理对象变成了目标对象和切面的连接点，连接点是一个静态的										     概念，配置代理了接口和目标对象——切面，建立物理上的连接，但是我们可以通过选择切入点去使用哪一个方法
 
-# 拦截器
 
-![5](image/5.png)
+
+![5](image/8.png)
 
 如果实现了**环绕通知** 就必须要实现`invocation.proceed();` 方法，这个方法会有一个object类型的返回值，必须接住向上返回，否则在主函数中不会收到返回值
 
 ![6](image/6.png)
+
+
+
+## 1.通过实现接口来配置
+
+1.BeforeAdvice：继承了Advice接口，里面没有方法
+
+```java
+public interface BeforeAdvice extends Advice 
+```
+MethodBeforeAdvice：继承了接口，里面有方法
+```java
+
+public interface MethodBeforeAdvice extends BeforeAdvice{
+ 	void before(Method method, Object[] args, Object target) throws Throwable; 
+}
+```
+
+```java
+    <aop:config>
+        <aop:pointcut id="pointcut" expression="execution(* com.service.UserServiceImp.*(..))" />
+        <aop:advisor advice-ref="logs" pointcut-ref="pointcut"/>
+        <aop:advisor advice-ref="afterLogs" pointcut-ref="pointcut"/>
+    </aop:config>
+```
+
+2.AfterAdvice：继承Advice接口，没有方法
+
+AfterReturningAdvice
+
+```java
+void afterReturning(Object returnValue, Method method, Object[] args, Object target) throws Throwable;
+```
+
+环绕，异常都一样配置同上
+
+## 2.通过自定义类来实现（自定义切面）
+
+自己定义的一个通知类首先需要在xml上面配上对切面的扫描
+
+```java
+@Order(0)
+@Aspect
+@Controller
+public class MyAdvice {
+
+	
+    @Pointcut("execution(* com.service.*.*(..))")
+    public void pointcut(){}
+
+
+    @Before("pointcut()")
+    public  void before(JoinPoint joinPoint){
+        System.out.println("自定义前置");
+    }
+    @After("pointcut()")
+    public  void after(JoinPoint joinPoint){
+        System.out.println("自定义后置");
+    }
+
+    @AfterReturning("pointcut()")
+    public  void afterReturning(JoinPoint joinPoint){
+        System.out.println("自定义返回值后置");
+    }
+    @Around("pointcut()")
+    public  Object around(ProceedingJoinPoint joinPoint) throws Throwable {
+        System.out.println("环绕");
+        Object o =joinPoint.proceed();
+        System.out.println("环绕");
+        return o;
+    }
+    @AfterThrowing(value = "pointcut()",throwing = "e")
+    public void afterThrow(JoinPoint joinPoint, Throwable e){
+
+    }
+}
+```
+
+### 当被切入的时候的正常执行情况，注意**After和AfterReturning ** 顺序
+
+![9](image/9.png)
+
+### 当出错的时候
+
+![10](image/10.png)
+
+### 当有两个切面对一个点进行切割的时候
+
+需要在类上面加上`@Order` 来定义优先级，数值越小，优先级越高，假如Aspect1优先级比Aspect2高，那么执行过程如下
+
+![11](image/11.png)
+
+如果在同一个Aspect定义两个Before或者其他的通知，是没有办法确定两个的执行顺序的
