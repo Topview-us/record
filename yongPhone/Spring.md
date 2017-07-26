@@ -413,11 +413,209 @@
 
   ​			${          }									使用属性
 
+## 代理
+
+### 静态代理
+
+![](pictures/Spring12.png)
+
+静态代理角色分析
+
+- 抽象角色：一般使用接口或者抽象类来决定
+- 真实角色：被代理的角色
+- 代理角色：代理真实角色，代理真实角色后一般会做一些附属操作
+- 客户：使用代理角色来进行一些操作
+
+优点：
+
+- 使得真实角色处理的业务更加存粹，不再关注一些公共的事情
+- 公共的业务由代理来完成，实现了业务的分工
+- 公共事物发生拓展时变得更加集中和方便
+
+缺点：
+
+- 多了代理类，工作量变大了。开发效率降低了。
+
+## 动态代理
+
+- 动态代理角色同静态代理
+- 动态代理的代理类是动态生成的
+
+#### 接口代理 ：JDK动态代理
+
+抽象角色
+
+```java
+public interface Rent {
+    void rent();
+}
+```
+
+真实角色
+
+```java
+public class Host implements Rent {
+    @Override
+    public void rent() {
+        System.out.println("执行租房操作");
+    }
+}
+```
+
+代理角色
+
+```java
+public class ProxyRent implements InvocationHandler {
+    private Object target;
+    /**
+     * 绑定委托对象并返回一个代理类
+     * @param target
+     * @return
+     */
+    public Object getProxy(Object target) {
+      	//取得真实角色
+        this.target = target;
+        
+      	//Proxy类是专门完成代理的操作类，可以通过此类为一个或多个接口动态地生成实现类
+      	//ClassLoader loader：类加载器 
+		//Class<?>[] interfaces：得到全部的接口 
+		//InvocationHandler h：得到InvocationHandler接口的子类实例 
+        return Proxy.newProxyInstance(target.getClass().getClassLoader(),
+                target.getClass().getInterfaces(), this);   
+      	//要绑定接口(这是一个缺陷，cglib弥补了这一缺陷)
+    }
+
+    @Override
+    /**
+     * 调用方法
+     * Object proxy：指被代理的对象
+     * Method method:要调用的方法
+     * Object[] args:方法调用时需要用到的参数
+     */
+    public Object invoke(Object proxy, Method method, Object[] args)
+            throws Throwable {
+        Object result=null;
+        System.out.println("事物开始");
+        //执行方法
+        result=method.invoke(target, args);
+        System.out.println("事物结束");
+        return result;
+    }
+}
+```
+
+客户
+
+```java
+    public static void main(String[] args) {
+        ProxyRent proxyRent = new ProxyRent();
+        Rent rent = (Rent) proxyRent.getProxy(new Host());
+        rent.rent();
+    }
+```
+
+#### 类代理：cglib
+
+原理：对指定的目标类生成一个子类，并覆盖其中方法实现增强，但因为采用的是继承，所以不能对final修饰的类进行代理
+
+抽象角色
+
+```java
+	public interface BookFacade {  
+        public void addBook();  
+    }  
+```
+
+真实角色
+
+```java
+    /** 
+     * 这个是没有实现接口的实现类 
+     */  
+    public class BookFacadeImpl1 {  
+        public void addBook() {  
+            System.out.println("增加图书的普通方法...");  
+        }  
+    }  
+```
+
+```java
+	/** 
+     * 使用cglib动态代理 
+     */  
+    public class BookFacadeCglib implements MethodInterceptor {  
+        private Object target;  
+      
+        /** 
+         * 创建代理对象 
+         * @param target 
+         * @return 
+         */  
+        public Object getInstance(Object target) {  
+            this.target = target;  
+            Enhancer enhancer = new Enhancer();  
+            enhancer.setSuperclass(this.target.getClass());  
+            // 回调方法  
+            enhancer.setCallback(this);  
+            // 创建代理对象  
+            return enhancer.create();  
+        }  
+      
+        @Override  
+        // 回调方法  
+        public Object intercept(Object obj, Method method, Object[] args,  
+                MethodProxy proxy) throws Throwable {  
+            System.out.println("事物开始");  
+            proxy.invokeSuper(obj, args);  
+            System.out.println("事物结束");  
+            return null;  
+        }  
+      
+    }  
+
+```
+
+客户
+
+```java
+public class TestCglib {  
+    public static void main(String[] args) {  
+        BookFacadeCglib cglib=new BookFacadeCglib();  
+        BookFacadeImpl1 bookCglib=(BookFacadeImpl1)cglib.getInstance(new BookFacadeImpl1());  
+        bookCglib.addBook();  
+    }  
+}  
+```
+
 ## AOP编程
 
 AOP( aspect oriented programming ) 面向切面(方面)编程
 
 是对所有对象或者是一类对象编程，核心是( 在**不**增加代码的基础上， **还**增加新功能 )
+
+在Spring中的作用:
+
+1. 提供声明式事务
+2. 允许用户实现自定义切面
+
+### 纵向编程和横向编程
+
+- 纵向编程：自上而下jsp-->action-->service-->dao
+
+- 横向编程：
+
+  AOP：不增加代码的基础上，增加新功能（横向切割加入日志等功能）-->代理来实现
+
+   	    好处同代理的好处！！！
+
+### 名词解释
+
+- 关注点：增加的某个业务。如日志、安全、缓存、事务等
+- 切面：一个关注点的模块化，这个关注点可能会横切多个对象
+- 连接点：方法的执行
+- 通知：在切面的某个特定的连接点执行的动作
+- 目标对象：被代理的对象
+- 织入：一个过程，把切面连接到对象上并且创建被通知的对象的过程
 
 ### 步骤
 
@@ -447,6 +645,9 @@ AOP( aspect oriented programming ) 面向切面(方面)编程
 
    ```java
    public class MyMethodBeforeAdvice implements MethodBeforeAdvice{
+     	//method:被调用的方法对象
+     	//objects被调用的方法的参数
+     	//目标对象（被代理的对象）
        @Override
        public void before(Method method, Object[] objects, Object o) throws Throwable {
            System.out.println("写入日志");
@@ -524,7 +725,7 @@ AOP( aspect oriented programming ) 面向切面(方面)编程
    | 通知类型   | 接口                                       | 描述           |
    | ------ | ---------------------------------------- | ------------ |
    | Around | org.aopalliance.intercept.MethodInterceptor | 拦截对目标方法调用    |
-   | Before | Org.springframework.aop.MethodBeforeAdvice | 在目标方法调用前调用   |
+   | Before | Org.springframework.aop.MethodBeforeAdvice | 在目标方调用前调用    |
    | After  | Org.springframework.aop.AfterReturningAdvice | 在目标方法调用后调用   |
    | Throws | Org.springframework.aop.ThrowsAdvice     | 当目标方法抛出异常时调用 |
 

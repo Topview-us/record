@@ -363,7 +363,7 @@ public class Boss2 implements MethodReplacer {
 - 还可以\<import>将多个文件引入一个文件
 
   ```xml
-  <import resource="classspath:xxx/xxx/xxx.xml"
+  <import resource="classpath:xxx/xxx/xxx.xml"
   ```
 
   > 如果没有import，两个配置文件互相引用也是可以的，只需要将配置文件都放在配置文件列表即可
@@ -507,3 +507,21 @@ p(153)
 
 ## AOP基础
 
+有毒，这章不知道怎么做笔记
+
+### 概念
+
+连接点：两个信息确定（方法表示的程序的执行点、相对位置表示的方位）
+
+​		eg：在Test.foo()执行前的连接点，那么执行点是Test.foo()，方位是该方法执行前的位置
+
+切点：通过一些信息定位到连接点上
+
+### 创建切面
+
+## Spring对Dao的支持
+
+### 配置一个数据源
+
+1. DBCP数据源：![](pictures/spring4x13.png)![](pictures/spring4x14.png)
+2. C3P0数据源:![](pictures/spring4x15.png)
