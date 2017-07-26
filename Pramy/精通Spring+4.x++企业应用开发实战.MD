@@ -292,13 +292,35 @@ optimize：当设置为true是，强制使用CGlib代理，对于其他作用域
 
 # 第十一章
 
+## 11.1.1 数据库事务
+
+ACID
+
+原子性（Atomic）：表示组成一个事物的多个数据库操作是一个不可分割的原子单元，只有所有的操作执行成功，整个事务才提交。事务中的任何一个数据库操作失败已经执行的任何操作都必须撤销，让数据库返回到初始状态
+
+一致性（Consistency）：事务操作成功后，数据库所处的状态和他的业务规则是一致的，即数据不会被破坏
+
+隔离性（Isolation）：在并发数据库操作时，不同的事物拥有各自的数据空间，他们的操作不会对对方产生干扰。
+
+持久性（Durability）：一旦事务提交成功后，事务中所有的数据操作都必须被持久化到数据库中
+
+- 脏读（dirty read）:由于多线程操作对于同一目标进行操作，事务提交有出入
+
+  ![11](image/11.png)
+
+- 不可重复读（unrepeatable read）
+
+- 幻想读（phantom read）
+
+  ![12](image/12.png)
+
+- ​
+
 ## 11.2.1  ThreadLocal
 
 **ThreadLoacal** 它是一个保存线程本地化对象的容器。当运行于多线程环境的谋个对象使用ThreadLocal维护变量是，ThreadLocal为每一个使用该变量的线程分配一个独立的变量副本，每一个线程都可以独立得该店自己的副本，而不会影响其他线程对副本。因为每一个线程创建的时候自己都会有一个副本。而线程和线程之间的副本都是相对其他线程的副本独立存在的。
 
 **InheritableThreadLocal** 继承于ThreadLocal，他自动为子线程赋值一份从父线程那里继承而来的本定变量：在创建子线程时，子线程会接收所有可继承的线程本定变量的初始值
-
-### ThreadLocal
 
 get，set ，remove，initialValue
 
@@ -308,3 +330,39 @@ initialValue：返回该线程局部变量的初始值，可以重写，在线�
 
 ![10](image/10.png)
 
+## 11.5事务管理的配置
+
+XML配置：
+
+```xml
+<!-- 事务配置 start -->
+<!--声明事务管理器-->
+<bean id="transactionManager"
+      class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+    <property name="dataSource" ref="dataSource">
+    </property>
+</bean>
+<!--声明自己的事务-->
+<tx:advice id="txadvice" transaction-manager="transactionManager">
+    <tx:attributes>
+        <tx:method name="save*" propagation="REQUIRED"/>
+        <tx:method name="delete*" propagation="REQUIRED"/>
+        <tx:method name="update*" propagation="REQUIRED"/>
+        <tx:method name="transfer*" propagation="REQUIRED"/>
+        <tx:method name="insert*" propagation="REQUIRED"/>
+        <tx:method name="change*" propagation="REQUIRED"/>
+        <tx:method name="do*" propagation="REQUIRED"/>
+        <tx:method name="*" propagation="REQUIRED" read-only="true"/>
+    </tx:attributes>
+</tx:advice>
+<aop:config>
+    <aop:pointcut
+            expression="execution(* cn.kiiwii.framework.spring.TestSpring.springwithmybatis.service.impl.*.*(..))"
+            id="txpointcut"/>
+    <aop:advisor advice-ref="txadvice" pointcut-ref="txpointcut"/>
+</aop:config>
+
+<!-- 事务配置 end -->
+```
+
+![13](image/13.png)
