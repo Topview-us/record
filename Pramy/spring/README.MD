@@ -1,3 +1,5 @@
+
+
 # 一.spring配置文件
 
 ```xml
@@ -347,9 +349,16 @@ ApplicationContextAware给你传入ApplicationContext
 <context:property-placeholder location="classpath:com/hsp/dispatch/db.properties,classpath:com/hsp/dispatch/db2.properties"/>
 ```
 
-# AOP编程（aspect oriented programming）
+# 六 AOP编程
 
-面向切面编程，核心（在不增加代码饿基础上，还增加新功能 ）
+面向切面编程（aspect oriented programming），核心（在不增加代码饿基础上，还增加新功能 ）,提供声明式服务（声明式事物），允许用户实现自定义切面
+
+- 连接点(Joinpoint):一个类或者一段程序代码拥有一些具有边界性质的特定点，是客观存在的事物
+- 切点(Pointcut):切点是自己定义带有选择性地去寻找连接点，是自己定义的。
+- 通知(Advice):就是需要加入的一些公共内容或者方法
+- 目标对象
+- 织入(Weaving):是一个将增强的内容加到目标类的具体连接点上的过程
+- 切面(Aspect):由切点和增加内容组成
 
 ![4](image/4.png)
 
@@ -417,10 +426,249 @@ public class A implements HelloInterface,ByeInterface {
 
 总结：事务管理器被抽取出来成为一个切面，然而代理对象变成了目标对象和切面的连接点，连接点是一个静态的										     概念，配置代理了接口和目标对象——切面，建立物理上的连接，但是我们可以通过选择切入点去使用哪一个方法
 
-# 拦截器
 
-![5](image/5.png)
+
+![5](image/8.png)
 
 如果实现了**环绕通知** 就必须要实现`invocation.proceed();` 方法，这个方法会有一个object类型的返回值，必须接住向上返回，否则在主函数中不会收到返回值
 
 ![6](image/6.png)
+
+
+
+## 1.通过实现接口来配置
+
+1.BeforeAdvice：继承了Advice接口，里面没有方法
+
+```java
+public interface BeforeAdvice extends Advice 
+```
+MethodBeforeAdvice：继承了接口，里面有方法
+```java
+
+public interface MethodBeforeAdvice extends BeforeAdvice{
+ 	void before(Method method, Object[] args, Object target) throws Throwable; 
+}
+```
+
+```java
+    <aop:config>
+        <aop:pointcut id="pointcut" expression="execution(* com.service.UserServiceImp.*(..))" />
+        <aop:advisor advice-ref="logs" pointcut-ref="pointcut"/>
+        <aop:advisor advice-ref="afterLogs" pointcut-ref="pointcut"/>
+    </aop:config>
+```
+
+2.AfterAdvice：继承Advice接口，没有方法
+
+AfterReturningAdvice
+
+```java
+void afterReturning(Object returnValue, Method method, Object[] args, Object target) throws Throwable;
+```
+
+环绕，异常都一样配置同上
+
+## 2.通过自定义类来实现（自定义切面）
+
+自己定义的一个通知类首先需要在xml上面配上对切面的扫描
+
+```java
+@Order(0)
+@Aspect
+@Controller
+public class MyAdvice {
+
+	
+    @Pointcut("execution(* com.service.*.*(..))")
+    public void pointcut(){}
+
+
+    @Before("pointcut()")
+    public  void before(JoinPoint joinPoint){
+        System.out.println("自定义前置");
+    }
+    @After("pointcut()")
+    public  void after(JoinPoint joinPoint){
+        System.out.println("自定义后置");
+    }
+
+    @AfterReturning("pointcut()")
+    public  void afterReturning(JoinPoint joinPoint){
+        System.out.println("自定义返回值后置");
+    }
+    @Around("pointcut()")
+    public  Object around(ProceedingJoinPoint joinPoint) throws Throwable {
+        System.out.println("环绕");
+        Object o =joinPoint.proceed();
+        System.out.println("环绕");
+        return o;
+    }
+    @AfterThrowing(value = "pointcut()",throwing = "e")
+    public void afterThrow(JoinPoint joinPoint, Throwable e){
+
+    }
+}
+```
+
+### 当被切入的时候的正常执行情况，注意**After和AfterReturning ** 顺序
+
+![9](image/9.png)
+
+### 当出错的时候
+
+![10](image/10.png)
+
+### 当有两个切面对一个点进行切割的时候
+
+需要在类上面加上`@Order` 来定义优先级，数值越小，优先级越高，假如Aspect1优先级比Aspect2高，那么执行过程如下
+
+![11](image/11.png)
+
+如果在同一个Aspect定义两个Before或者其他的通知，是没有办法确定两个的执行顺序的
+
+# 七 事务管理
+
+## 1.xml配置aop切面
+
+```xml
+<!--声明事务管理器,一般是jdbc-->
+<bean id="txManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+    <property name="dataSource" ref="dataSource"/>
+</bean>
+<!--end -->
+
+<!--定义事务的切面-->
+<tx:advice id="interceptor" transaction-manager="txManager">
+    <tx:attributes>
+        <tx:method name="insert" />
+        <tx:method name="add*"/>
+    </tx:attributes>
+</tx:advice>
+<!--织入-->
+    <aop:config>
+        <aop:pointcut id="daoPointCut" expression="execution(* com.pramy.service.*.*(..))"/>
+        <aop:advisor advice-ref="interceptor" pointcut-ref="daoPointCut"/>
+    </aop:config>
+```
+
+## 2.注解配置
+
+```xml
+<!--声明事务-->
+<bean id="txManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+    <property name="dataSource" ref="dataSource"/>
+</bean>
+<!--配置扫描器-->
+<tx:annotation-driven transaction-manager="txManager"/>
+```
+
+然后再需要织入的连接点上面加上注解`@Transactional`
+
+无论是在xml或者是用注解，都可以设置一些属性值
+
+## 3 事务的配置
+
+![img](..//image/13.png)
+
+### 传播行为：
+
+| 传播行为          | 含义                                       |
+| ------------- | ---------------------------------------- |
+| REQUIRED(默认值) | 表示当前方法必须要在事务中，如果没有事务就新建一个，如果该方法被A调用，如果A存在事务就加进去 |
+| SUPPORTS      | 如果单独调用B时没有事务，B就没有用事务去执行，如果A有事务调用了B，那么B就事务地执行 |
+| MANDATORY     | A调用B时，如果A本身没有事务，则会抛出异常                   |
+| REQUIRED_NEW  | 每一次都用一个新的事务管理器来执行                        |
+| NOT_SUPPORTED | 总是不用事务管理器来执行，如果A本身有事务管理器，调用了B，B会将事务管理器挂起 |
+| NEVER         | 总是不用事务来执行，一旦有一个事务，则会抛出异常                 |
+| NESTED        |                                          |
+
+# 八 spring对cache的支持
+
+## 1. 基于注解的支持
+
+- @cacheable：需要注意的是当一个支持缓存的方法在对象内部被调用时是不会触发缓存功能的
+
+  - Value:指定cache名称，可以指定一个也可以指定多个
+
+    ```java
+    @Cacheable("cache1") ||  @Cacheable({"cache1", "cache2"})
+    ```
+
+  - Key：自定义key，支持EL表达式
+
+    ```java
+       @Cacheable(value="users", key="#id")  //用参数标量来做key
+       public User find(Integer id) {
+          returnnull;
+       }
+       @Cacheable(value="users", key="#p0")  //用第一个参数来做key
+       public User find(Integer id) {
+          returnnull;
+       }
+       @Cacheable(value="users", key="#user.id") //EL表达式来获取id
+       public User find(User user) {
+          returnnull;
+       }
+       @Cacheable(value="users", key="#p0.id") //第一个参数来获取id
+       public User find(User user) {
+          returnnull;
+       }
+    ```
+
+     除了上述使用方法参数作为key之外，Spring还为我们提供了一个root对象可以用来生成key。通过该root对象我们可以获取到以下信息。
+
+    | **属性名称**    | **描述**           | **示例**               |
+    | ----------- | ---------------- | -------------------- |
+    | methodName  | 当前方法名            | #root.methodName     |
+    | method      | 当前方法             | #root.method.name    |
+    | target      | 当前被调用的对象         | #root.target         |
+    | targetClass | 当前被调用的对象的class   | #root.targetClass    |
+    | args        | 当前方法参数组成的数组      | #root.args[0]        |
+    | caches      | 当前被调用的方法使用的Cache | #root.caches[0].name |
+
+  - condition：指定缓存发生的条件
+
+    ```java
+     @Cacheable(value={"users"}, key="#user.id", condition="#user.id%2==0")
+    ```
+
+- @CachePut
+
+  在Cacheable的情况下spring首先会检查cache中没有相同key的缓存元素，如果存在就不再执行该方法，而是直接从缓存中获取结果进行返回，否则才会执行并将返回结果存入指定的缓存中。@CachePut也可以声明一个方法支持缓存功能。与@Cacheable不同的是使用@CachePut标注的方法在执行前不会去检查缓存中是否存在之前执行过的结果，而是每次都会执行该方法，并将执行结果以键值对的形式存入指定的缓存中。
+
+- @CacheEvict
+
+  @CacheEvict是用来标注在需要清除缓存元素的方法或类上的。当标记在一个类上时表示其中所有的方法的执行都会触发缓存的清除操作。@CacheEvict可以指定的属性有value、key、condition、allEntries和
+
+  - allEntries：allEntries是boolean类型，表示是否需要清除缓存中的所有元素。默认为false，表示不需要。当指定了allEntries为true时，Spring Cache将忽略指定的key。
+  - beforeInvocation：清除操作默认是在对应方法成功执行之后触发的，即方法如果因为抛出异常而未能成功返回时也不会触发清除操作。使用beforeInvocation可以改变触发清除操作的时间，当我们指定该属性值为true时，Spring会在调用该方法之前清除缓存中的指定元素。
+
+## 2.XML配置
+
+```xml
+   <cache:advice id="cacheAdvice" cache-manager="cacheManager">
+      <cache:caching cache="users">
+         <cache:cacheable method="findById" key="#p0"/>
+         <cache:cacheable method="find" key="#user.id"/>
+         <cache:cache-evict method="deleteAll" all-entries="true"/>
+      </cache:caching>
+   </cache:advice>
+
+//用cache定义一个缓存管理器，接下来用aop切入就可以了
+
+```
+
+## 3.spring配置中配置Ehcache
+
+```xml
+<!--cache 基于Ehcache-->
+<cache:annotation-driven cache-manager="cacheManager"/>
+<bean id="cacheManager" class="org.springframework.cache.ehcache.EhCacheCacheManager">
+    <property name="cacheManager" ref="cache"/>
+</bean>
+<bean id="cache" class="org.springframework.cache.ehcache.EhCacheManagerFactoryBean">
+    <property name="configLocation" value="classpath:ehcache.xml"/>
+</bean>
+<!--cache end-->
+```
