@@ -99,12 +99,12 @@
   </modules>
 ```
 - 依赖管理  
-dependencyManagement的特性：在dependencyManagement中配置的元素既不会给parent引入依赖，也不会给它的子模块引入依赖，仅仅是它的配置是可继承的
+  dependencyManagement的特性：在dependencyManagement中配置的元素既不会给parent引入依赖，也不会给它的子模块引入依赖，仅仅是它的配置是可继承的
     - 所以在子文件只需要表明groupId和artifactId就可以，详细信息在父文件
 
 ## 依赖特性
-- 依赖范围<scope>  
-pom文件的<dependency></dependency>标签对可以设置一个<scope></scope>标签对，值如下
+- 依赖范围\<scope>  
+  pom文件的\<dependency>\</dependency>标签对可以设置一个\<scope>\</scope>标签对，值如下
     - compile(默认)：在编译、测试、打包的时候都把依赖加进去
     - test：仅测试范围内依赖有效
     - privided：编译、测试的时候会把依赖加进去，但是打包的时候就不会把依赖加进去，例如servlet-api
@@ -124,7 +124,7 @@ pom文件的<dependency></dependency>标签对可以设置一个<scope></scope>�
                 artifactId  
             </exclusion>  
         </exclusions>
-        
+
 > 冲突（还没搞清楚原因）：依赖net.sf.json这个包的时候，json-b直接依赖于commons-lang的2.5版本，然后通过直接依赖于ezmorph来间接依赖commons-lang的2.3版本会有冲突，不加以解决compile能通过，但是将2.3修改为2.5冲突会消失。此外依赖这个包的时候要父子项目同时指定<classfied>参数为jdk15才能正常compile
 
 ## 生命周期

@@ -593,10 +593,12 @@ AOP( aspect oriented programming ) 面向切面(方面)编程
 
 是对所有对象或者是一类对象编程，核心是( 在**不**增加代码的基础上， **还**增加新功能 )
 
-在Spring中的作用:
+AOP在Spring中的作用:
 
 1. 提供声明式事务
 2. 允许用户实现自定义切面
+
+> Spring AOP 就是将公共业务（如日志，安全等）的领域业务结合。当执行领域业务时将会把公共业务加进来。实现公共业务的重复利用，专注开发领域业务更加纯粹。
 
 ### 纵向编程和横向编程
 
@@ -646,8 +648,8 @@ AOP( aspect oriented programming ) 面向切面(方面)编程
    ```java
    public class MyMethodBeforeAdvice implements MethodBeforeAdvice{
      	//method:被调用的方法对象
-     	//objects被调用的方法的参数
-     	//目标对象（被代理的对象）
+     	//objects:被调用的方法的参数
+     	//o :目标对象（被代理的对象）
        @Override
        public void before(Method method, Object[] objects, Object o) throws Throwable {
            System.out.println("写入日志");
@@ -714,6 +716,225 @@ AOP( aspect oriented programming ) 面向切面(方面)编程
 
       - 通过getBean获得代理对象，然后强制转换为接口类型，就可以调用被代理对象的方法。
 
+   很好，看完了尚学堂的视频，才知道韩顺平的方法那么复杂
+
+   ### 方法二：基于xml
+
+   - 要导入spring-aop包和spring-aspect包
+
+   写两个增强类吧
+
+   ```java
+   public class LogBeforeAdvice implements MethodBeforeAdvice {
+       @Override
+       public void before(Method method, Object[] objects, Object o) throws Throwable {
+           System.out.println("前置增强执行：" + method.getName() + "in" + o);
+       }
+   }
+   ```
+
+   ```java
+   public class LogAfterAdvice implements AfterReturningAdvice {
+       @Override
+       public void afterReturning(Object o, Method method, Object[] objects, Object o1) throws Throwable {
+           System.out.println("后置通知执行：" + method.getName() + " return " + o);
+       }
+   }
+   ```
+
+   被代理的接口及其实现类
+
+   ```java
+   public interface UserService {
+       void add();
+       void delete();
+       void insert();
+       void update();
+   }
+   ```
+
+   ```java
+   public class UserServiceImpl implements UserService {
+       @Override
+       public void add() {
+           System.out.println("执行添加操作");
+       }
+
+       @Override
+       public void delete() {
+           System.out.println("执行删除操作");
+       }
+
+       @Override
+       public void insert() {
+           System.out.println("执行插入操作");
+       }
+
+       @Override
+       public void update() {
+           System.out.println("执行更新操作");
+       }
+   }
+   ```
+
+   aop-beans.xml
+
+   ```xml
+       <!-- 前置增强 -->
+   	<bean id="beforeLog" class="com.spring.proxy.LogBeforeAdvice"/>
+   	<!-- 后置增强 -->
+       <bean id="AfterLog" class="com.spring.proxy.LogAfterAdvice"/>
+   	<!-- 亲爱的接口 -->
+       <bean id="userService" class="com.spring.proxy.UserServiceImpl"/>
+
+       <aop:config>
+         	        				 <!-- 切面路径，第一个*表示返回值，后面的是精确到方法的路径 -->
+         	<!-- 定义切面 --> 								<!-- (..)表示匹配任何入参的方法 -->	
+           <aop:pointcut id="firstAop" expression="execution(* com.spring.proxy.*.*(..))"/>
+         	<!-- 前置增强 -->
+           <aop:advisor advice-ref="beforeLog" pointcut-ref="firstAop"/>
+         	<!-- 后置增强 -->
+           <aop:advisor advice-ref="AfterLog" pointcut-ref="firstAop"/>
+       </aop:config>
+   ```
+
+   ### 方法三：自定义方法实现AOP
+
+   自定义方法前后执行的方法
+
+   ```java
+   public class MyAdvice {
+       public void before(){
+           System.out.println("方法前执行");
+       }
+
+       public void after(){
+           System.out.println("方法后执行");
+       }
+   }
+   ```
+
+   aop-beans.xml配置
+
+   ```xml
+       <!-- 接口 -->
+   	<bean id="userService" class="com.spring.proxy.UserServiceImpl"/>
+   	<!-- 自定义增强类 -->
+       <bean id="advice" class="com.spring.proxy.MyAdvice"/>
+       <aop:config>
+         	<!-- ref指定切面要使用的增强 -->
+           <aop:aspect ref="advice">
+             	<!-- 设置切面 -->
+               <aop:pointcut id="secondAop" expression="execution(* com.spring.proxy.*.*())"/>
+               <!-- 第一个before是表示方法前执行，第二个表示MyAdvice中的方法名 -->
+             	<aop:before method="before" pointcut-ref="secondAop"/>
+             	<!-- after解析同before -->
+               <aop:after method="after" pointcut-ref="secondAop"/>
+           </aop:aspect>
+       </aop:config>
+   ```
+
+   被代理的接口及其实现类
+
+   ```java
+   public interface UserService {
+       void add();
+       void delete();
+       void insert();
+       void update();
+   }
+   ```
+
+   ```java
+   public class UserServiceImpl implements UserService {
+       @Override
+       public void add() {
+           System.out.println("执行添加操作");
+       }
+
+       @Override
+       public void delete() {
+           System.out.println("执行删除操作");
+       }
+
+       @Override
+       public void insert() {
+           System.out.println("执行插入操作");
+       }
+
+       @Override
+       public void update() {
+           System.out.println("执行更新操作");
+       }
+   }
+   ```
+
+   ### 方法四：使用注解实现
+
+   自定义增强
+
+   ```java
+   //标记
+   @Aspect
+   public class MyAdvice {
+     	//前置方法，迟于环绕前
+       @Before("execution(* com.spring.proxy.*.*())")
+       public void before(){
+           System.out.println("方法前执行");
+       }
+   	//后置方法，迟于环绕后
+       @After("execution(* com.spring.proxy.*.*())")
+       public void after(){
+           System.out.println("方法后执行");
+       }
+     	//环绕方法
+       @Around("execution(* com.spring.proxy.*.*())")
+       public Object Around(ProceedingJoinPoint joinPoint) throws Throwable {
+           System.out.println("环绕前执行");
+           System.out.println(joinPoint.getSignature());
+         	//使目标方法执行，不然就会执行不到目标方法
+         	//o是目标方法返回的对象，如果目标方法是void，可以不return
+           Object o = joinPoint.proceed();
+           System.out.println("输出对象：" + o);
+           System.out.println("环绕后执行");
+           return o;
+       }
+   }
+   ```
+
+   配置
+
+   ```xml
+       <!-- 注入要被代理的接口 -->
+   	<bean id="userService" class="com.spring.proxy.UserServiceImpl"/>
+   	<!-- 注入自定义增强Bean -->
+       <bean id="advice" class="com.spring.proxy.MyAdvice"/>
+       <!-- 自动扫描注解 -->
+       <aop:aspectj-autoproxy/>
+   ```
+
+   接口及其实现类
+
+   ```java
+   public interface UserService {
+       String add();
+   }
+   ```
+
+   ```java
+   public class UserServiceImpl implements UserService {
+       @Override
+       public String add() {
+           System.out.println("执行添加操作");
+           return "add";
+       }
+   }
+   ```
+
+   ### 当有两个切面对一个点进行切割的时候
+
+   需要在类上面加上`@Order` 来定义优先级，数值越小，优先级越高，假如Aspect1优先级比Aspect2高
+
    ### 代理方式
 
    - 如果用ProxyFactory的setInterfaces方法进行**指定目标接口代理**的话--JDK动态代理技术创建代理
@@ -758,6 +979,237 @@ AOP( aspect oriented programming ) 面向切面(方面)编程
 ![img](pictures/proxy2.png)
 
 > 设置了proxyTargetClass = “true”属性之后无需再设置proxyInterfaces，设置了也会被忽略
+
+## Mybatis整合Spring
+
+```xml
+<?xml version="1.0" encoding="UTF-8" ?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xmlns:p="http://www.springframework.org/schema/p" xmlns:aop="http://www.springframework.org/schema/aop"
+       xmlns:tx="http://www.springframework.org/schema/tx"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-4.0.xsd
+    http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-4.0.xsd http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-4.0.xsd http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-4.0.xsd">
+    <!--<context:component-scan base-package="com.blog" resource-pattern="**/dao/*.class"/>-->
+    <context:component-scan base-package="com.blog.www.dao"/>
+    <context:annotation-config/>
+    <!-- 配置数据源 -->
+    <context:property-placeholder location="classpath:db.properties"/>
+    <bean id="dataSource"
+          class="org.apache.commons.dbcp.BasicDataSource"
+          destroy-method="close"
+          p:driverClassName="${driver}"
+          p:url="${url}"
+          p:username="${name}"
+          p:password="${password}"/>
+    <!-- 配置SqlSessionFactory -->
+    <bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+        <property name="dataSource" ref="dataSource"/>
+        <property name="configLocation" value="classpath:mybatis.xml"/>
+        <property name="mapperLocations" value="classpath*:mapper/*.xml"/>
+    </bean>
+
+    <bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+        <property name="sqlSessionFactoryBeanName" value="sqlSessionFactory"/>
+        <property name="basePackage" value="com.blog.www.dao"/>
+    </bean>
+    <!--<bean id="transactionManager"-->
+          <!--class="org.springframework.jdbc.datasource.DataSourceTransactionManager"-->
+          <!--p:dataSource-ref="dataSource"/>-->
+
+    <!--<tx:annotation-driven transaction-manager="transactionManager"/>-->
+</beans>
+```
+
+## 事务管理
+
+### 事务管理基础
+
+#### 数据库事务特性
+
+- 数据库事务必须同时满足四个特性：
+
+  - 原子性：一起成功和失败
+  - 一致性：事务操作成功后，数据库所处的状态和她的业务规则一致
+  - 隔离性：并发数据时，互不干扰。数据库规定了多种事务隔离级别，隔离级别越高，事务一致性越好，但是并发性越弱
+  - 持久性：事务提交成功后，所有数据操作都必须持久化到数据库中
+
+  > 数据库管理系统一般采用重执行日志来保证原子性、一致性和持久性。重执行日志记录了数据库变化的每一个动作，一旦事务发生错误就会根据重执行日志撤销操作。
+
+#### 并发的问题
+
+- 脏读：A和B两个线程，原数据600，B是修改数据500-->A查询数据500-->B撤销修改事务，数据600-->A按照查询结果减少100，数据为400，提交事务
+- 不可重复读：A,B读取数据-->B修改数据，提交事务-->A再次读取数据，两个时间点读取数据不同
+- 幻像读：A读取总数据-->B新增数据，提交事务-->A再次读取总数据，两个时间点读取总数据不同
+- 第一类丢失更新：A、B开始事务，数据1000-->B修改数据500，提交事务-->A撤销事务，事务回滚，数据1000
+- 第二类丢失更新：A、B开始事务，查询数据1000-->B减少100，数据900，提交事务-->A添加100，数据1100（丢失B线程的数据更新）
+
+#### 数据库锁的机制：解决并发问题
+
+#### 事务的隔离级别
+
+- TransactionDefinition.ISOLATION_DEFAULT：这是默认值，表示使用底层数据库的默认隔离级别。对大部分数据库而言，通常这值就是TransactionDefinition.ISOLATION_READ_COMMITTED。
+- TransactionDefinition.ISOLATION_READ_UNCOMMITTED：该隔离级别表示一个事务可以读取另一个事务修改但还没有提交的数据。该级别不能防止脏读和不可重复读，因此很少使用该隔离级别。
+- TransactionDefinition.ISOLATION_READ_COMMITTED：该隔离级别表示一个事务只能读取另一个事务已经提交的数据。该级别可以防止脏读，这也是大多数情况下的推荐值。
+- TransactionDefinition.ISOLATION_REPEATABLE_READ：该隔离级别表示一个事务在整个过程中可以多次重复执行某个查询，并且每次返回的记录都相同。即使在多次查询之间有新增的数据满足该查询，这些新增的记录也会被忽略。该级别可以防止脏读和不可重复读。
+- TransactionDefinition.ISOLATION_SERIALIZABLE：所有的事务依次逐个执行，这样事务之间就完全不可能产生干扰，也就是说，该级别可以防止脏读、不可重复读以及幻读。但是这将严重影响程序的性能。通常情况下也不会用到该级别
+
+![](pictures/spring14.png)
+
+### 声明式事务
+
+#### 方法一：基于xml的配置
+
+```xml
+	<!-- 声明式事务配置 -->
+    <!-- 声明事务管理器 -->
+    <bean id="transactionManager"
+          class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+        <property name="dataSource" ref="dataSource">
+        </property>
+    </bean>
+    <!--声明自己的事务-->
+    <tx:advice id="txManager" transaction-manager="transactionManager">
+      	<!-- 配置每个方法使用什么事务，以及事务的传播特性 -->
+        <tx:attributes>
+            <!-- 如果不存在事务，新建事务；如果存在事务，支持原来的事务 -->
+            <tx:method name="add" propagation="REQUIRED"/>
+            <!-- 只读 -->
+            <tx:method name="select*" read-only="true"/>
+        </tx:attributes>
+    </tx:advice>
+    <!-- 设置切面 -->
+    <aop:config>
+        <aop:pointcut expression="execution(* com.spring.proxy.StudentService.*(..))" id="pointcut"/>
+        <aop:advisor advice-ref="txManager" pointcut-ref="pointcut"/>
+    </aop:config>
+```
+
+- 切面一般设置在service层，而不是dao层，service才是事务处理的地方
+
+#### 方法二：基于注解的配置
+
+```xml
+    <!-- 声明式事务配置：基于注解 -->
+    <!--声明事务-->
+    <bean id="txManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+        <property name="dataSource" ref="dataSource"/>
+    </bean>
+    <!--配置扫描器-->
+    <tx:annotation-driven transaction-manager="txManager"/>
+```
+
+然后再需要织入的连接点、类上面加上注解`@Transactional`
+
+无论是在xml或者是用注解，都可以设置一些属性值
+
+### 事务的属性
+
+![](pictures/spring13.png)
+
+### 传播行为：
+
+| 传播行为          | 含义                                       |
+| ------------- | ---------------------------------------- |
+| REQUIRED(默认值) | 表示当前方法必须要在事务中，如果没有事务就新建一个，如果该方法被A调用，如果A存在事务就加进去 |
+| SUPPORTS      | 如果单独调用B时没有事务，B就没有用事务去执行，如果A有事务调用了B，那么B就事务地执行 |
+| MANDATORY     | A调用B时，如果A本身没有事务，则会抛出异常                   |
+| REQUIRED_NEW  | 每一次都用一个新的事务管理器来执行                        |
+| NOT_SUPPORTED | 总是不用事务管理器来执行，如果A本身有事务管理器，调用了B，B会将事务管理器挂起 |
+| NEVER         | 总是不用事务来执行，一旦有一个事务，则会抛出异常                 |
+| NESTED        | 比原来多嵌套一层事务                               |
+
+## Spring Cache
+
+### 概念
+
+#### 缓存命中率
+
+![](pictures/spring15.png)
+
+#### 过期策略
+
+- FIFO：先进先出	first in first out
+- LRU：最久未使用被移除    least recently used
+- LFU：最少是用被移除    least frequently used
+- TTL：存活期，从缓存中创建的时间点直至到期的一个时间段    time to live
+- TTI：空闲期，一个数据多久没被访问就被移除    time to idle
+
+### Spring中实现缓存
+
+xml配置
+
+```xml
+    <!-- 启动基于注解的缓存驱动 -->
+	<cache:annotation-driven/>
+<!--这个配置项默认使用了定义为cacheManager的缓存管理器，SimpleCacheManager是这个缓存管理器的默认实现-->    
+
+    <!-- 配置缓存处理器 -->
+    <bean id="cacheManager" class="org.springframework.cache.support.SimpleCacheManager">
+        <property name="caches">
+            <list>
+              	<!-- 默认缓存 -->
+                <bean name="default" class="org.springframework.cache.concurrent.ConcurrentMapCacheFactoryBean"/>
+              	<!-- 自定义缓存 -->
+                <bean name="students" class="org.springframework.cache.concurrent.ConcurrentMapCacheFactoryBean"/>
+            </list>
+        </property>
+    </bean>
+```
+
+搜索操作类
+
+```java
+@Service
+public class StudentService {
+    @Autowired
+    private StudentDao studentDao;
+
+    <!-- 先在students中查询匹配的缓存对象，如果存在直接返回
+		 如果不存在，再在数据库中查询 	      
+      -->
+    @Cacheable("students")
+    public StudentPo select(int id){
+        System.out.println("从数据库中查找");
+        return studentDao.select(id);
+    }
+}
+```
+
+#### 《Spring4.x》有基于XML的Cache声明:P506
+
+### Spring Cache注解
+
+- @Cacheable
+
+  先在缓存中查找数据，如果找不到再去数据库找并缓存结果
+
+  ![](pictures/spring16.png)
+
+- @CachePut
+
+  首先执行方法，再将返回值放入缓存。（希望使用方法返回值更新缓存时使用）、
+
+  用法、属性和@Cacheable基本一样
+
+  > 注意：不能在同一个方法使用@CachePut和@Cacheable，因为他们有不同特性
+
+- @CacheEvict
+
+  从给定缓存显式移除一个值，默认情况下，这个注解在方法调用后运行
+
+  除了和@Cacheable相同的三个属性，还有两个：
+
+  ![](pictures/spring16.png)
+
+- @Caching
+
+  组注解，基于上面三种注解的数组
+
+- @CacheConfig
+
+  类级别的全局缓存注解，上面4个都只是方法级别的
 
 ## Else
 
