@@ -430,9 +430,88 @@ Spring MVC在调用目标处理方法前，会先逐个调用在方法级上标�
   >
   >    这样@ModelAttribute的方法在每个方法调用前执行，就不会有不存在key而抛出异常
 
+### 使用矩阵变量绑定参数
+
+## HttpMessageConverter\<T>
+
+HttpMessageConverter\<T>是一个重要接口，负责将请求信息转换为一个**对象**（类型为T），将**对象**（类型为T）输出为响应信息
+
+- Spring为HttpMessageConverter\<T>提供了众多实现类，见《精通Spring4.x》P575
+- RequestMappingHandlerAdapter默认装配了下列HttpMessageConverter
+  - StringHttpMessageConverter：将请求信息转换为字符串
+  - ByteArrayHttpMessageConverter：读/写二进制数据
+  - SourceHttpMessageConverter：读/写javax.xml.transform.Source类型的数据
+  - AllEncompassingFormHttpMrssageConverter
+
+### 使用HttpMessageConverter\<T>
+
+![](pictures/springmvc17.png)
+
+#### @RequestBody--有毒系列
+
+有毒：用get请求是无法成功的，要用post请求
+
+jsp表单：
+
+```jsp
+<form action="testRequestBody" method="post">
+    <input name="name" value="haha">
+    <input type="submit">
+</form>
+```
+
+controller:
+
+```java
+    @RequestMapping(value = "/testRequestBody", method = RequestMethod.POST)
+    public String testRequestBody(@RequestBody String requestBody){
+        System.out.println(requestBody);
+        return "success";
+    }
+```
+
+#### @ResponseBody--优雅系列
+
+据说，和前端对接，只要把数据@ResponseBody一下就可以了
+
+```java
+    @ResponseBody
+    @RequestMapping(value = "/testResponseBody")
+    public byte[] testResponseBody() throws IOException {
+        File file = new File("D:\\黄永锋\\临时\\883049933962685952.jpg");
+        byte[] bytes = FileCopyUtils.copyToByteArray(file);
+        return bytes;
+    }
+```
+
+- 有Response
+
+#### @HttpEntity\<T>和@ResponseEntity\<T>
+
+可以访问请求和响应的报头和报文体的数据
+
+!!!记得发POST请求，用HttpEntity的时候
+
+```java
+    @RequestMapping(value = "/testEntity", method = RequestMethod.POST)
+    public ResponseEntity<byte[]> testEntity(HttpEntity<String> httpEntity) throws IOException {
+        long contentLength = httpEntity.getHeaders().getContentLength();
+        System.out.println(httpEntity.getHeaders());
+        System.out.println(contentLength);
+        System.out.println(httpEntity.getBody());
+
+        File file = new File("D:\\黄永锋\\临时\\883049933962685952.jpg");
+        byte[] bytes = FileCopyUtils.copyToByteArray(file);
+        ResponseEntity<byte[]> responseEntity = new ResponseEntity<byte[]>(bytes, HttpStatus.OK);
+        return responseEntity;
+    }
+```
+
 ## 视图解析器
 
-- SpringMVC 为逻辑视图名的解析提供了不同的策略，可以在 Spring WEB 上下文中配置一种或多种解析策略，并指定他们之间的先后顺序。每一种映射策略对应一个具体的视图解析器实现类。
+- Spring MVC 为逻辑视图名的解析提供了不同的策略，可以在 Spring WEB 上下文中配置一种或多种解析策略，并指定他们之间的先后顺序。每一种映射策略对应一个具体的视图解析器实现类。
+
+  （orderNo属性可以指定解析器的优先顺序，值越小优先级越高）
 
 -  视图解析器的作用比较单一：将逻辑视图解析为一个具体的视图对象 
 
@@ -504,10 +583,14 @@ public class HelloView implements View {
 
 优雅的 REST 风格的资源URL 不希望带 .html 或 .do 等后缀
 
-- 若将 DispatcherServlet 请求映射配置为 /，则 Spring MVC 将捕获WEB 容器的所有请求，包括静态资源的请求， SpringMVC 会将他们当成一个普通请求处理，因找不到对应处理器将导致错误。
+- 若将 DispatcherServlet 请求映射配置为 /，则 Spring MVC 将捕获WEB 容器的所有请求，包括静态资源的请求， Spring MVC 会将他们当成一个普通请求处理，因找不到对应处理器将导致错误。
+
+### 方法一：\<mvc:default-servlet-handler>
+
 - 可以在 SpringMVC 的配置文件中**配置\<mvc:default-servlet-handler/> 的方式解决静态资源**的问题：
   -  \<mvc:default-servlet-handler/> 将在 SpringMVC 上下文中定义一个DefaultServletHttpRequestHandler，它会对进入 DispatcherServlet 的请求进行筛查，如果发现是没有经过映射的请求，就将该请求交由 WEB应用服务器默认的 Servlet 处理，如果不是静态资源的请求，才由DispatcherServlet 继续处理
   -  一般 WEB 应用服务器默认的 Servlet 的名称都是 default。若所使用的WEB 服务器的默认 Servlet 名称不是 default，则需要通过 default-servlet-name 属性显式指定 
+  -  \<mvc:default-servlet-handler/>将静态资源的处理经由Spring MVC框架交回Web应用服务器
 
 ```xml
     <!--防止其他请求404-->
@@ -516,7 +599,33 @@ public class HelloView implements View {
     <mvc:default-servlet-handler/>
 ```
 
-（没试验成功！！！！）
+### 方法二：\<mvn:resources/>
+
+\<mvc:resources/>由Spring MVC框架自己处理静态资源，并且添加一些有用的附加功能
+
+执行机制：
+
+在接受到静态资源的请求时，会检查请求头的Last-Modified值。如果静态资源没有发生变化，则直接返回303状态响应码，指示客户端使用浏览器缓存的数据。
+
+配置：
+
+```xml
+<mvc:resources mapping="/resources/**" location="/META-INF/" cache-period="31536000"/>
+```
+
+- location：
+  - 指定静态资源的位置，可以是任何地方
+  - 可以使用诸如`calsspath：` 等资源前缀指定资源位置
+  - 可以使用逗号间隔多个资源路径
+- mapping：
+  - 将location中的`/META-INF/`  路径映射为`/resources` 路径
+  - 如果用户直接通过url访问包含WEB-INF、META-INF的路径，那么Spring MVC会直接返回null，但是可以通过resources路径访问里面的静态资源
+  - 一个逻辑路径表示的资源有可能在多个物理路径都存在，处理机制是，只要找到第一个匹配的资源就返回，查找顺序与物理路径在location中的配置顺序有关
+- cache-period:
+  - 设置资源在客户端浏览器的缓存有效时间，一般是设置为一年，以便充分利用客户端的缓存资源
+- 静态资源更新怎么办：
+  - 解决办法：在网页中引用静态的资源路径（逻辑路径mapping）添加应用的发布版本号，这样这些静态资源就会成为新的资源了
+  - 在上面解决方案的基础上可以写一个ServlerContextAware的实现类，通过这个实现类返回版本号包含到\<mvc:resources/>中，详见《精通Spring4.x》P641
 
 ## \<mvn:annotation-driven />
 
@@ -600,7 +709,118 @@ Spring 定义了 3 种类型的转换器接口，实现任意一个转换器接�
 
 ## 数据格式化
 
-(没成功，jdk1.7好像不支持)
+按照格式输入，然后类型转换器将其转化为对应的类型
+
+- `@NumberFormat`
+- `@DateTimeFormat`
+
+实体类User
+
+```java
+public class User {
+    private String name;
+    private int age;
+    private Adress adress;
+
+    @DateTimeFormat(pattern = "yyyy-mm-dd")
+    private Date birthDay;
+
+    @NumberFormat(pattern = "#,###.##")
+    private int salary;
+  
+	//省略getter和setter
+}
+
+```
+
+springmvc.xml
+
+```xml
+    
+<!-- mvn:annotation-driven标签内部会默认创建ConversionService实例
+	 把原来的Conversion实例在像下面那样改为
+	 FormattingConversionServiceFactoryBean就可以了
+-->
+<mvc:annotation-driven conversion-service="conversionService"/>
+
+	<bean name="conversionService" class="org.springframework.format.support.FormattingConversionServiceFactoryBean">
+        <property name="converters">
+            <list>
+                <bean class="com.spring.mvc.UserConverter"/>
+            </list>
+        </property>
+    </bean>
+```
+
+@DateTimeFormat和@NumberFormat的属性都是互斥的
+
+- @DateTimeFormat属性：
+
+  ![](pictures/springmvc12.png)
+
+- @NumberFormat属性：
+
+  ![](pictures/springmvc13.png)
+
+## 数据校验
+
+#### JSR-303校验框架
+
+- Spring本身并没有提供JSR-303的实现，所以必须将JAR-303的实现（如Hibernate Validator）的jar依赖
+
+![](pictures/springmvc13.png)
+
+- Hibernate Validator在JSR-303的基础上添加：
+
+![](pictures/springmvc14.png)
+
+#### 在Spring MVC中数据校验
+
+`<mvc:annotation-driven/>`会默认装配一个LocalValidatorFactoryBean，通过在处理方法的入参钱标注@Valid注解，即可让Spring MVC在完成数据绑定后执行数据校验工作。
+
+User的age属性必须大于0
+
+```java
+public class User {
+    private String name;
+
+    @Min(0)
+    private int age;
+
+    private Adress adress;
+
+    @DateTimeFormat(pattern = "yyyy-mm-dd")
+    private Date birthDay;
+
+    @NumberFormat(pattern = "#,###.##")
+    private int salary;
+}
+```
+
+Controller中测试一下
+
+```java
+    @RequestMapping("testFormat")
+    public String testFormat(@Valid User user, Errors errors){
+        System.out.println(errors);
+        System.out.println(user);
+        return "success";
+    }
+```
+
+![](pictures/springmvc15.png)
+
+- Spring MVC 是通过对处理方法的签名的规约来保存验证结果的：前一个表单/命令对象的检验结果保存在其后的入参中，这个保存检验结果的入参必须为BindingResult或者Errors型的
+
+- BindingResult/Errors有许多方法获得验证的结果信息
+
+- 被检验的对象和结果对象是一对一关系
+
+  ![](pictures/springmvc16.png)
+
+#### 在页面中检验校验结果
+
+Spring除了将校验结果保存到BindingResult或者Errors对象中外，还将所有的校验结果保存到“隐藏模型”中。前端可以通过HttpServletRequest的属性列表获取校验错误信息，详见《精通Spring4.x》P607（反正我没成功）
 
 ## 国际化
 
@@ -673,7 +893,7 @@ jsp显示
 配置：
 
 ```xml
-    <!-- 配置SessionLocalResolver -->
+    <!-- 配置SessionLocaleResolver -->
     <bean id="localeResolver" class="org.springframework.web.servlet.i18n.SessionLocaleResolver"/>
     <!-- 配置LocaleChanceInterceptor -->
     <mvc:interceptors>
@@ -690,6 +910,45 @@ jsp
 ```
 
 ![](pictures/springmvc7.png)
+
+## 本地化
+
+### 概念
+
+web应用根据用户的浏览器设置判断客户端的本地化类型，比如“语言首选项”。
+
+默认情况下，spring mvc 根据Accept-language参数判断客户端本地化类型，此外，它还提供了多种指定客户端本地化类型的方式，如cookie、session指定
+
+- 当收到请求时，Spring MVC 会在上下文中找到一个本地化解析器（LocaleResolver），找到后可以使用它请求所对应的本地化类型信息
+- Spring MVC 还允许装配一个动态更改本地化类型的拦截器，这样通过指定一个请求参数就可以控制单个请求的本地化类型
+- 本地化解析器和拦截器都定义在`org.springframework.web.servlet.i18n`这个包中，可以在配置文件中配置
+
+### 本地化解析器类型
+
+#### AcceptHeaderLocaleResolver
+
+根据报文头的Accept-Language参数确定本地化类型。
+
+如果没有显式指定本地化解析器，默认用这个。
+
+#### CookieLocaleResolver
+
+用cookie保存本地化类型信息，只需要配置一个CookieLocaleResolver，DispatcherServler会自动识别并装配它
+
+![](pictures/springmvc18.png)
+
+#### SessionLocaleResolver
+
+![](pictures/springmvc19.png)
+
+### LocaleChangeInterceptor
+
+可以实现通过超链接切换Locale，不再依赖于浏览器的语言设置情况（上面国际化的第三点）
+
+![](pictures/springmvc20.png)
+
+- 原理：LocaleChangeInterceptor拦截器从请求中获取本地化类型并设置给真正本地化解析器CookieLocaleResolver。
+- 由于AcceptHeaferLocaleResolver是从请求报文头获取本地化信息的，因此不能被动态更改，所以只能选择CookieLocaleResolver或者SessionLocaleResolver
 
 ## 文件上传
 
@@ -773,7 +1032,7 @@ public class FirstInterceptor implements HandlerInterceptor {
         <bean class="com.spring.mvc.FirstInterceptor"/>
         <!-- 配置LocaleChangeInterceptor,与本例无关 -->
         <bean class="org.springframework.web.servlet.i18n.LocaleChangeInterceptor"/>
-    </mvc:interceptors
+	</mvc:interceptors>
 ```
 
 ![](pictures/springmvc8.png)
@@ -800,7 +1059,7 @@ jar
 
 ![](pictures/springmvc6.png)
 
-- @ResponseRntity可以用来做文件下载
+- @ResponseEntity可以用来做文件下载
 
 ## 异常处理
 
@@ -912,10 +1171,56 @@ controller：
 <mvc:annotation-driven/>
 ```
 
-- 待解决问题
-  1. 发送DELETE\PUT请求
-  2. 处理静态资源
+##  RequestContextHolder的使用
 
-### Spring IOC容器和Spring MVC IOC容器的关系
+Spring API 提供了工具类RequestContextHolder，能够在controller中获取request和session对象
+
+使用方式：
+
+web.xml中配置监听器
+
+```xml
+<listener>
+	<listener-class>
+		org.springframework.web.context.request.RequestContextListener
+	</listener-class>
+</listener>
+```
+
+controller使用：
+
+```java
+    @RequestMapping("/testRequestListener")
+    public String testRequestListener(){
+        HttpServletRequest request = ((ServletRequestAttributes)RequestContextHolder.getRequestAttributes()).getRequest();
+        System.out.println(request.getRequestURL());
+        return "success";
+    }
+```
+
+### IDEA之有毒系列
+
+自动生成的web.xml头文件有毒，配置不进listener
+
+解决：换一个优秀的头文件就好了
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app version="2.5" xmlns="http://java.sun.com/xml/ns/javaee"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://java.sun.com/xml/ns/javaee 
+	http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd">
+	
+	
+</web-app>
+```
+
+## Spring IOC容器和Spring MVC IOC容器的关系
 
 mvc的中的Bean可以引用spring中的Bean，反之不可以。
+
+## 待解决的问题
+
+1. 发送DELETE\PUT请求
+2. 使用矩阵绑定参数
+
