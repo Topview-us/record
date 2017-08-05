@@ -496,3 +496,103 @@ public String valid(@Valid @ModelAttribute("user") User user, BindingResult bind
 
 处理器的选择是看泛型，传入是什么类型，@RequestBody就会调用相对应的处理器，@RespondBody看返回值类型
 
+## 文件上传下载MultipartResolver
+
+```xml
+<!--文件上传下载-->
+<bean id="multipartResolver" class="org.springframework.web.multipart.commons.CommonsMultipartResolver">
+    <property name="defaultEncoding" value="UTF-8"/>
+</bean>
+```
+
+相关依赖
+
+```xml
+<dependency>
+    <groupId>commons-fileupload</groupId>
+    <artifactId>commons-fileupload</artifactId>
+    <version>1.3.3</version>
+</dependency>
+<dependency>
+    <groupId>commons-io</groupId>
+    <artifactId>commons-io</artifactId>
+    <version>2.5</version>
+</dependency>
+```
+
+函数：
+
+```java
+@RequestParam("file")MultipartFile file
+```
+
+## 拦截器
+
+自定义拦截器需要实现**HandlerInterceptor** 接口
+
+其中有三个方法：
+
+```java
+@Override
+public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+    System.out.println("preHandle");
+    return true;
+}
+@Override
+public void postHandle(HttpServletRequest request, HttpServletResponse response, Object handler, ModelAndView modelAndView) throws Exception {
+    System.out.println("postHandle");
+}
+@Override
+public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) throws Exception {
+    System.out.println("afterCompletion");
+}		
+```
+
+- preHandle：是在目标方法被调用前调用，如果返回的是false后面的拦截器就不会被调用
+- postHandle：是在目标方法调用后，渲染视图之前被调用，在这里可以对视图对象修改
+- afterCompletion：在渲染视图之后被调用
+
+然后在xml上面配上拦截器
+
+```xml
+<mvc:interceptors>
+    <bean class="com.pramy.bind.interceptor.MyIntercept" />
+</mvc:interceptors>
+```
+
+### 自定义拦截路径
+
+在xml中可以配置
+
+```xml
+<mvc:interceptors>
+    <mvc:interceptor>
+        <mvc:mapping path="/"/>
+        <mvc:mapping path="/bind"/>
+        <bean class="com.pramy.bind.interceptor.MyIntercept"/>
+    </mvc:interceptor>
+</mvc:interceptors>
+```
+
+在子元素`<mvc:interceptor>` 中配置拦截的url，可以配置多个url，同时也可以去除拦截的url，
+
+多个拦截器的原理
+
+![6](image/6.png)
+
+# 五 异常
+
+## @ResponseStatus
+
+可以标记一个方法，也可以标记一个方法。
+
+value：状态码(HttpStatus.code)
+
+reason：返回的原因
+
+如果标记方法的话，一样会抛出异常，但是方法正常运行
+
+# 六 MVC运行
+
+![7](image/7.png)
+
