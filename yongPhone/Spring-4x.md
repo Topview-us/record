@@ -525,3 +525,88 @@ p(153)
 
 1. DBCP数据源：![](pictures/spring4x13.png)![](pictures/spring4x14.png)
 2. C3P0数据源:![](pictures/spring4x15.png)
+
+## 实战开发
+
+### 解决中文乱码
+
+- 使用Spring的编码转换过滤器，将请求信息的编码统一转换为UTF-8
+
+  （这种方法对get请求无效）
+
+```xml
+	<filter>
+		<filter-name>encodingFilter</filter-name>
+		<filter-class>org.springframework.web.filter.CharacterEncodingFilter</filter-class>
+		<init-param>
+			<param-name>encoding</param-name>
+			<param-value>UTF-8</param-value>
+		</init-param>
+		<init-param>
+			<param-name>forceEncoding</param-name>
+			<param-value>true</param-value>
+		</init-param>
+	</filter>
+	<filter-mapping>
+		<filter-name>encodingFilter</filter-name>
+		<url-pattern>*.html</url-pattern>
+	</filter-mapping>
+	<filter-mapping>
+		<filter-name>encodingFilter</filter-name>
+		<url-pattern>*.jsp</url-pattern>
+	</filter-mapping>
+```
+
+### 避免直接使用字面值常量
+
+- 通过常量定义的方式予以规避
+- 在一个包中定义应用级常量
+
+### 统一管理异常体系
+
+- 在exception包中定义业务异常类及系统异常等
+
+### 系统架构
+
+- 一个基础功能的模块，其他的再按照角色进行划分
+
+### 类的设计
+
+#### PO类
+
+- BaseDomain是所有PO的基类，它实现了Serializable接口。
+
+  ```java
+  public class BaseDomain implements Serializable {
+      //统一的toString方法
+      public String toString() {
+          return ToStringBuilder.reflectionToString(this);
+      }
+  }
+  ```
+
+  - 实现Serializable接口：JVM能够方便地将PO实例化到硬盘中，或者通过流的方式进行发送，为缓存、集群的功能带来便利
+  - toString：可以通过Apache的ToStirngBuilder工具类来统一实现
+
+#### DAO类
+
+- 创建一个BaseDao\<T>
+
+#### Service层
+
+#### Web层
+
+- 定义一个Controller的基类：BaseController，它提供其他Controller共有的一些方法，比如从Session中获取登录的用户对象、请求转向一个URL等。其他Controller继承于这个BaseController。
+
+### 缓存
+
+- 只使用内存的缓存：适合目标对象少且不常发生更改，比如论坛中的板块对象
+
+  （缓存区中的对象永不过期）
+
+- 硬盘缓存：书中的实例是，对象在闲置300秒后就从缓存中清除，且对象最大存活期限为30min，缓存区最大的实例个数为5000个
+
+### 其他
+
+- 书中建议使用UUID作为主键，因为使用自增主键可能有一些潜在的问题，比如在配置型应用中，会涉及配置模型数据导入导出的操作，此时容易造成主键冲突。（还没体会到额）
+

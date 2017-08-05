@@ -43,7 +43,6 @@ springmvc.xml
         <property name="prefix" value="/WEB-INF/views/"></property>
         <property name="suffix" value=".jsp"/>
     </bean>
-
 ```
 
 请求处理器
@@ -169,6 +168,11 @@ controller
 - value 值即为请求参数的参数名
 - required 该参数是否是必须的，默认值是true
 - defaultValue 请求参数的默认值
+- 有无@RequestParam注入的区别：
+  - 无：按照入参类型匹配
+  - 有：按照属性名匹配
+    - 先按照@RequestParam后面括号的value匹配
+    - 如果没有指定value，那么就按照入参的名字匹配
 
 ### @RequestHeader
 
@@ -408,7 +412,7 @@ Spring MVC在调用目标处理方法前，会先逐个调用在方法级上标�
   > 	 * 2. 在 implicitModel 中查找 key 对应的对象, 若存在, 则作为入参传入
   > 	 * 1). 若在 @ModelAttribute 标记的方法中在 Map 中保存过, 且 key 和 1 确定的 key 一致, 则会获取到. 
   > 	 * 3. 若 implicitModel 中不存在 key 对应的对象, 则检查当前的 Handler 是否使用 @SessionAttributes 注解修饰, 若使用了该注解, 且 @SessionAttributes 注解的 value 属性值中包含了 key, 则会从 HttpSession 中来获取 key 所对应的 value 值, 若存在则直接传入到目标方法的入参中. 若不存在则将抛出异常. 
-  > 	 * 4. 若 Handler 没有标识 @SessionAttributes 注解或 @SessionAttributes 注解的 value 值中不包含 key, 则会通过反射来创建 POJO 类型的参数, 传入为目标方法的参数
+  > 	 * 4. 若 Handler 没有标识 @SessionAttributes 注解或 @SessionAttributes 注解的 value 值中不包含 key,·· 则会通过反射来创建 POJO 类型的参数, 传入为目标方法的参数
   > 	 * 5. SpringMVC 会把 key 和 POJO 类型的对象保存到 implicitModel 中, 进而会保存到 request 中. 
   > ```
   >
@@ -1215,6 +1219,40 @@ controller使用：
 </web-app>
 ```
 
+## Spring MVC定时器的使用
+
+1. 配置
+
+   ```xml
+       <!-- 定时删除任务 -->
+       <task:annotation-driven/>
+
+       <context:annotation-config/>
+       <bean class="org.springframework.beans.factory.annotation.AutowiredAnnotationBeanPostProcessor"/>
+       <context:component-scan base-package="com.blog.www.servlet"/>
+   ```
+
+   注意namespace
+
+   ```xml
+   xmlns:task="http://www.springframework.org/schema/task" 
+
+   http://www.springframework.org/schema/task http://www.springframework.org/schema/task/spring-task-3.2.xsd
+   ```
+
+2. 定时器
+
+   ```java
+   @Component
+   public class DeleteOnTime {
+     //执行的时间间隔
+     @Schedule(fixedDelay = 30000)
+     public void deleteFile(){
+       
+     }
+   }
+   ```
+
 ## Spring IOC容器和Spring MVC IOC容器的关系
 
 mvc的中的Bean可以引用spring中的Bean，反之不可以。
@@ -1223,4 +1261,5 @@ mvc的中的Bean可以引用spring中的Bean，反之不可以。
 
 1. 发送DELETE\PUT请求
 2. 使用矩阵绑定参数
+
 
